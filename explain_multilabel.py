@@ -13,8 +13,11 @@ import pickle
 import csv
 
 
-labels = ['HI', 'ID', 'IN', 'IP', 'LY', 'NA', 'OP', 'SP']
-
+labels = ['HI', 'ID', 'IN', 'IP', 'LY', 'NA', 'OP', 'SP', 'av', 'ds', 'dtp', 'ed', 'en', 'fi', 'it', 'lt', 'mt', 'nb', 'ne', 'ob', 'ra', 're', 'rs', 'rv', 'sr']
+file_name = ".tsv"
+int_bs = 10
+data_name = ""   #path and .pkl already in code
+model_name = ""  #path and .pt already in code
 
 # # Forward on the model -> data in, prediction out, nothing fancy really
 def predict(model, inputs, attention_mask=None):  
@@ -103,7 +106,7 @@ def explain(text,model,tokenizer,wrt_class="winner"):
     for tg in target[0]:
         attrs, delta= lig.attribute(inputs=(inp.input_ids,inp.attention_mask),         
                                      baselines=(b_input_ids,b_attention_mask),         
-                                     return_convergence_delta=True,target=tuple([np.array(tg)]),internal_batch_size=1)
+                                     return_convergence_delta=True,target=tuple([np.array(tg)]),internal_batch_size=int_bs)
         # append the calculated and normalized scores to aggregated
         attrs_sum = attrs.sum(dim=-1)
         attrs_sum = attrs_sum/torch.norm(attrs_sum)
@@ -144,40 +147,36 @@ def print_scores(target, aggregated, idx):
 
 if __name__=="__main__":
     tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
-    model = torch.load("../multilabel_explainability/models/multilabel_model_enfifr.pt")
+    model = torch.load("../multilabel_explainability/models/"+model_name+".pt")
     model.to('cuda')
     print("Model loaded succesfully.")
     
-    with open('binarized_data/eacl_sv_binarized.pkl', 'rb') as f:
+    with open('binarized_data/'+data_name+'.pkl', 'rb') as f:
         dataset = pickle.load(f)
     print("Dataset loaded succesfully.")
         
         
-    # save doc_id, pred label(s), word/tokens and agg scores
-    # THIS IS A MESS
-    with open('test_scores.tsv', 'wt') as out_file:
-        tsv_writer = csv.writer(out_file, delimiter='\t')
-        for i in range(len(dataset['test'])):
-            print(i)    
-            txt = dataset['test']['sentence'][i]
-            lbl = dataset['test']['label'][i]
-            if txt == None:
-                txt = " "
-                
-            target,aggregated=explain(txt,model,tokenizer)
-            
-            # if a prediction was made
-            if target != None:
-                # for all labels and their agg scores
-                for tg, ag in zip(target[0], aggregated):
-                    target = tg
-                    aggregated = ag
-                    for tok,a_val in aggregated[0]:
-                        if a_val > 0:    #let's not waste time on irrelevant words
-                            tsv_writer.writerow(["document_"+str(i),target,str(tok),a_val])
-            
-    out_file.close() 
-    
+    save_matrix = []
+
+    for i in range(100):
+      #print(i)
+      txt = dataset['test']['sentence'][i]
+      lbl = np.nonzero(dataset['test']['label'][i][0])[0]
+      if txt == None:
+         txt = " "   # for empty sentences
+      target, aggregated = explain(txt, model, tokenizer)
+      if target != None:
+         # for all labels and their agg scores
+         for tg, ag in zip(target[0], aggregated):
+           target = tg
+           aggregated = ag
+           for tok,a_val in aggregated[0]:
+             if a_val > 0:    #let's not waste time on irrelevant words
+                line = ['document_'+str(i), str(lbl), target, str(tok), a_val]
+                save_matrix.append(line)
+
+    pd.DataFrame(save_matrix).to_csv(file_name, sep="\t")
+    print("Dataset succesfully saved")
          
     # nice colours :)
     #print_aggregated(target,aggregated, lbl)
