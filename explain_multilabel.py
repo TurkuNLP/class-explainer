@@ -158,7 +158,7 @@ if __name__=="__main__":
         
     save_matrix = []
 
-    for i in range(100):
+    for i in range(len(dataset['test'])):
       #print(i)
       txt = dataset['test']['sentence'][i]
       lbl = np.nonzero(dataset['test']['label'][i][0])[0]
