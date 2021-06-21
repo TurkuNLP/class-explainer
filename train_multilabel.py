@@ -205,18 +205,47 @@ def train(dataset, options):
       torch.save(trainer.model, options.save_model)#"models/multilabel_model3_fifrsv.pt")
 
 
+def get_label_counts(dataset):
+    label_counts = collections.Counter()
+    for ex in dataset:
+        for label in ex['labels'].split():
+            label_counts[label] += 1
+    return label_counts
+
+
 def resplit(dataset, ratio=None, seed=None):
-    """ Shuffle and resplit train and validation sets """
+""" Shuffle and resplit train and validation sets """
+
+    all_label_counts = get_label_counts(dataset)
 
     if seed is not None:
         random.seed(seed)
 
     if ratio is None:
-        #TODO: check train/val sizes from data and use same ratio
-        pass
+        
+        ## Saving the dataset still a problem, but can be done with key, just need to initialize new dataset somewhere
+        ratio = 0.5
+        dataset.shuffle()
+        ok = [FALSE]*2
+        max_deviance = 0
+        for i, (key,beg,end) in enumerate([('train', 0, int(len(dataset)*ratio)), ('validation', int(len(dataset)*ratio)), len(dataset))]):
+            subset = dataset[beg:end]
+            label_counts = get_label_counts(subset)
+            print("Subset: ", key, ", labels: ", len(label_counts))
+            ok[i] = len(label_counts) == len(all_label_counts)
+            deviance = 0.0
+            for label, count in all_label_counts.most_common():
+                deviance += float(label_counts[label]/len(subset)-count/len(data))
+        if all(ok):
+          print("Split succesfull! Deviance: ",deviance)
+          break
+        else:
+          print("Split unsuccesfull.")
     else:
+        
         #TODO: use given ratio
         pass
+        # same as before ? Just make ratio be 0.5 as default and if specified use that value
 
 
 if __name__=="__main__":
