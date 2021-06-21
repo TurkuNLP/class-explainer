@@ -231,6 +231,6 @@ if __name__=="__main__":
     dataset['validation'] = datasets.concatenate_datasets([dataset['validation'], d['validation']])
     dataset['test'] = datasets.concatenate_datasets([dataset['test'], d['test']])"""
 
-  dataset = read_dataset(option.data)
+  dataset = read_dataset(options.data)
   dataset = resplit(dataset, ratio=0.5, seed=options.seed)
   train(dataset, options)
