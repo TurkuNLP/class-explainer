@@ -11,6 +11,7 @@ from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampl
 from torch import cuda
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+import collections
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
@@ -67,22 +68,60 @@ class MultilabelTrainer(Trainer):
                         labels.float().view(-1, self.model.config.num_labels))
         return (loss, outputs) if return_outputs else loss
 
+    
+def get_label_counts(dataset):
+    """ Calculates the frequencies of labels of a dataset. """
+    label_counts = collections.Counter()
+    for line in dataset:
+        for label in line['label']:
+            label_counts[label] += 1
+    return label_counts
 
-def read_dataset(path):
-  """
-  Read the data. Labels should be in the form of binary vectors.
-  """
-  #data_name = 'binarized_data/eacl_'+tr+'_binarized.pkl'
-  with open(path, 'rb') as f:
-    dataset = pickle.load(f)
-  """if tr in ['fr','sv']:
-    dataset = sample_dataset(dataset,2, 'up')
-    dataset = sample_dataset(dataset,2, 'up')
-  if tr == 'en':
-    dataset = sample_dataset(dataset,5,'down')"""
-  print("Dataset succesfully loaded: "+data_name)
-  return dataset
+def resplit(dataset, ratio=None, seed=None):
+    """ Shuffle and resplit train and validation sets """                                      ##added indent
+    print("Dataset before split:")
+    print(dataset)
+    all_label_counts = get_label_counts(dataset['concat'])
 
+    if seed is not None:
+        random.seed(seed)
+
+    if ratio is None:
+      while True: 
+        
+        ratio = 0.5
+        dataset['concat'].shuffle()
+        ok = [False]*2
+        max_deviance = 0                                                                           
+        for i, (key,beg,end) in enumerate([('train', 0, int(len(dataset['concat'])*ratio)), ('validation', int(len(dataset['concat'])*ratio), len(dataset['concat']))]):
+            print(beg, end)
+            dataset[key] = dataset['concat'].select(range(beg,end))
+            print("Dataset after split:")
+            print(dataset)
+            print("Subset")
+            print(dataset[key][0])
+            #subset = dataset['concat'][beg:end]
+            
+            label_counts = get_label_counts(dataset[key])
+            print("Subset: ", key, ", labels: ", len(label_counts))
+            ok[i] = len(label_counts) == len(all_label_counts)
+            deviance = 0.0
+            for label, count in all_label_counts.most_common():
+                deviance += float(label_counts[label]/len(dataset[key])-count/len(dataset['concat']))
+        if all(ok):
+          print("Split succesfull! Deviance: ",deviance)
+          print(dataset)
+          return dataset
+          break                                                    
+        else:
+          print("Split unsuccesfull.")
+    else:
+        
+        #TODO: use given ratio
+        pass
+        # same as before ? Just make ratio be 0.5 as default and if specified use that value
+
+        
 def sample_dataset(d,n,sample):
   """
   Sample = {'up', 'down'}.
@@ -108,6 +147,64 @@ def sample_dataset(d,n,sample):
     d['test'] = d['test'].shuffle(seed = 123).shard(n,0)
 
     return d
+
+        
+        
+def remove_NA(d):
+  """
+  Remove null values and separate multilabel values with comma
+  """
+  if d['label'] == None:
+    d['label'] = np.array('NA')
+  if ' ' in d['label']:
+    d['label'] = ",".join(sorted(d['label'].split()))
+  return d
+
+def label_encoding(d):
+  """
+  Split the multi-labels
+  """
+  d['label'] = np.array(d['label'].split(","))
+  return d
+
+
+def remove_sublabels(d):
+  """
+  Remove the sub-labels (lower case) from data. Used for validation.
+  """
+  d['label'] =  [label for label in d['label'] if label.isupper()]
+  return d
+
+def binarize(dataset):
+    mlb = MultiLabelBinarizer()
+    mlb.fit(dataset['concat']['label'])
+    print("Binarizing the labels:")
+    dataset = dataset.map(lambda line: {'label': mlb.transform([line['label']])})
+    return dataset
+
+def read_dataset(path):
+  """
+  Read the data. Labels should be in the form of binary vectors.
+  """
+  
+  dataset = load_dataset(
+        'csv', 
+        data_files={'train':path+'/train.tsv'
+        , 'validation': path+'/dev.tsv' , 'concat': [path+'/train.tsv', path+'/dev.tsv']},
+        delimiter='\t', 
+        column_names=['label', 'sentence']
+        )
+
+  
+  dataset = dataset.map(remove_NA)
+  dataset = dataset.map(label_encoding)
+  
+  label_counts = get_label_counts(dataset['concat'])
+  print("Labels of the whole dataset: ",label_counts)
+
+  print("Dataset succesfully loaded: "+data_name)
+  return dataset
+
 
 
 def wrap_tokenizer_fn(tokenizer):
@@ -205,48 +302,6 @@ def train(dataset, options):
       torch.save(trainer.model, options.save_model)#"models/multilabel_model3_fifrsv.pt")
 
 
-def get_label_counts(dataset):
-    label_counts = collections.Counter()
-    for ex in dataset:
-        for label in ex['labels'].split():
-            label_counts[label] += 1
-    return label_counts
-
-
-def resplit(dataset, ratio=None, seed=None):
-""" Shuffle and resplit train and validation sets """
-
-    all_label_counts = get_label_counts(dataset)
-
-    if seed is not None:
-        random.seed(seed)
-
-    if ratio is None:
-        
-        ## Saving the dataset still a problem, but can be done with key, just need to initialize new dataset somewhere
-        ratio = 0.5
-        dataset.shuffle()
-        ok = [FALSE]*2
-        max_deviance = 0
-        for i, (key,beg,end) in enumerate([('train', 0, int(len(dataset)*ratio)), ('validation', int(len(dataset)*ratio)), len(dataset))]):
-            subset = dataset[beg:end]
-            label_counts = get_label_counts(subset)
-            print("Subset: ", key, ", labels: ", len(label_counts))
-            ok[i] = len(label_counts) == len(all_label_counts)
-            deviance = 0.0
-            for label, count in all_label_counts.most_common():
-                deviance += float(label_counts[label]/len(subset)-count/len(data))
-        if all(ok):
-          print("Split succesfull! Deviance: ",deviance)
-          break
-        else:
-          print("Split unsuccesfull.")
-    else:
-        
-        #TODO: use given ratio
-        pass
-        # same as before ? Just make ratio be 0.5 as default and if specified use that value
-
 
 if __name__=="__main__":
   options = argparser().parse_args(sys.argv[1:])
@@ -262,4 +317,5 @@ if __name__=="__main__":
 
   dataset = read_dataset(options.data)
   dataset = resplit(dataset, ratio=0.5, seed=options.seed)
+  dataset = binarize(dataset)
   train(dataset, options)
