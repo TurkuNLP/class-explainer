@@ -11,6 +11,7 @@ from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampl
 from torch import cuda
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.preprocessing import MultiLabelBinarizer
 import collections
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -201,7 +202,7 @@ def read_dataset(path):
   label_counts = get_label_counts(dataset['concat'])
   print("Labels of the whole dataset: ",label_counts)
 
-  print("Dataset succesfully loaded: "+data_name)
+  print("Dataset succesfully loaded: ")#+data_name)
   return dataset
 
 
