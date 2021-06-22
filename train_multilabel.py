@@ -26,6 +26,7 @@ LEARNING_RATE=1e-5
 BATCH_SIZE=16
 TRAIN_EPOCHS=6
 MODEL_NAME = 'xlm-roberta-base'
+MAX_DEVIANCE = 0.05
 # these are printed out by make_dataset.py
 labels = ['HI', 'ID', 'IN', 'IP', 'LY', 'NA', 'OP', 'SP', 'av', 'ds', 'dtp', 'ed', 'en', 'fi', 'it', 'lt', 'mt', 'nb', 'ne', 'ob', 'ra', 're', 'rs', 'rv', 'sr']
 
@@ -78,21 +79,24 @@ def get_label_counts(dataset):
     return label_counts
 
 def resplit(dataset, ratio=None, seed=None):
-    """ Shuffle and resplit train and validation sets """                                      ##added indent
-    print("Dataset before split:")
-    print(dataset)
+    """ Shuffle and resplit train and validation sets """                        
+    
+    # get all labels for comparison
     all_label_counts = get_label_counts(dataset['concat'])
 
     if seed is not None:
         random.seed(seed)
 
+    # If no ratio is given -> 0.5
     if ratio is None:
-      while True: 
-        
         ratio = 0.5
+        
+    while True: 
+        # We shuffle the save data in concat
         dataset['concat'].shuffle()
-        ok = [False]*2
-        max_deviance = 0                                                                           
+        # Three-way confirmation of whether the split is good (all labels in train, all labels in val, values balanced)
+        ok = [False]*3
+        deviance = 0                                                                           
         for i, (key,beg,end) in enumerate([('train', 0, int(len(dataset['concat'])*ratio)), ('validation', int(len(dataset['concat'])*ratio), len(dataset['concat']))]):
             print(beg, end)
             dataset[key] = dataset['concat'].select(range(beg,end))
@@ -105,21 +109,20 @@ def resplit(dataset, ratio=None, seed=None):
             label_counts = get_label_counts(dataset[key])
             print("Subset: ", key, ", labels: ", len(label_counts))
             ok[i] = len(label_counts) == len(all_label_counts)
-            deviance = 0.0
+            # Check deviance, add them up
             for label, count in all_label_counts.most_common():
                 deviance += float(label_counts[label]/len(dataset[key])-count/len(dataset['concat']))
+        # See if deviance/set is good
+        if deviance/2.0 <= MAX_DEVIANCE:
+            ok[-1] = True
+            
+        # if all is good
         if all(ok):
           print("Split succesfull! Deviance: ",deviance)
-          print(dataset)
-          return dataset
-          break                                                    
+          return dataset                                                   
         else:
           print("Split unsuccesfull.")
-    else:
-        
-        #TODO: use given ratio
-        pass
-        # same as before ? Just make ratio be 0.5 as default and if specified use that value
+   
 
         
 def sample_dataset(d,n,sample):
@@ -133,7 +136,6 @@ def sample_dataset(d,n,sample):
     d_shuffled_train = d['train'].shuffle(seed = 123)
     d_shuffled_validation = d['validation'].shuffle(seed = 123)
     d_shuffled_test = d['test'].shuffle(seed = 123)
-
 
     d['train'] = datasets.concatenate_datasets([d['train'], d_shuffled_train])
     d['validation'] = datasets.concatenate_datasets([d['validation'], d_shuffled_validation])
@@ -151,9 +153,7 @@ def sample_dataset(d,n,sample):
         
         
 def remove_NA(d):
-  """
-  Remove null values and separate multilabel values with comma
-  """
+  """ Remove null values and separate multilabel values with comma """
   if d['label'] == None:
     d['label'] = np.array('NA')
   if ' ' in d['label']:
@@ -161,21 +161,18 @@ def remove_NA(d):
   return d
 
 def label_encoding(d):
-  """
-  Split the multi-labels
-  """
+  """ Split the multi-labels """
   d['label'] = np.array(d['label'].split(","))
   return d
 
 
 def remove_sublabels(d):
-  """
-  Remove the sub-labels (lower case) from data. Used for validation.
-  """
+  """ Remove the sub-labels (lower case) from data. Used for validation. """
   d['label'] =  [label for label in d['label'] if label.isupper()]
   return d
 
 def binarize(dataset):
+    """ Binarize the labels of the data. Fitting based on the whole data. """
     mlb = MultiLabelBinarizer()
     mlb.fit(dataset['concat']['label'])
     print("Binarizing the labels:")
@@ -183,8 +180,10 @@ def binarize(dataset):
     return dataset
 
 def read_dataset(path):
-  """
-  Read the data. Labels should be in the form of binary vectors.
+  """ 
+  Read the data from tsv-files train.tsv-simp.tsv and dev.tsv-simp.tsv.
+  Saved into DatasetDict with keys train, validation and concat, where concat
+  contains the combined data that is used for saving and shuffling.
   """
   
   dataset = load_dataset(
@@ -195,7 +194,7 @@ def read_dataset(path):
         column_names=['label', 'sentence']
         )
 
-  
+  # Remove errors and format the labels
   dataset = dataset.map(remove_NA)
   dataset = dataset.map(label_encoding)
   
