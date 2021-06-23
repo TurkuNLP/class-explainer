@@ -45,7 +45,7 @@ def argparser():
                     help='Number of training epochs')
     ap.add_argument('--lr', '--learning_rate', metavar='FLOAT', type=float,
                     default=LEARNING_RATE, help='Learning rate')
-    ap.add_argument('--ratio', metavar='FLOAT', type=float,
+    ap.add_argument('--split', metavar='FLOAT', type=float,
                     default=None, help='Set fixed train/val data split ratio')
     ap.add_argument('--seed', metavar='INT', type=int,
                     default=None, help='Random seed for splitting data')
@@ -189,8 +189,8 @@ def read_dataset(path):
 
   dataset = load_dataset(
         'csv',
-        data_files={'train':path+'/train.tsv-simp.tsv', 
-                    'validation': path+'/dev.tsv-simp.tsv', 
+        data_files={'train':path+'/train.tsv-simp.tsv',
+                    'validation': path+'/dev.tsv-simp.tsv',
                     'concat': [path+'/train.tsv-simp.tsv', path+'/dev.tsv-simp.tsv']},
         delimiter='\t',
         column_names=['label', 'sentence']
@@ -199,7 +199,7 @@ def read_dataset(path):
   # Remove errors and format the labels
   dataset = dataset.map(remove_NA)
   dataset = dataset.map(label_encoding)
-  
+
   # get the label distribution of the whole data
   label_counts = get_label_counts(dataset['concat'])
   print("Labels of the whole dataset: ",label_counts)
@@ -310,9 +310,8 @@ if __name__=="__main__":
   print("Reading data")
   dataset = read_dataset(options.data)
   print("Splitting data")
-  dataset = resplit(dataset, ratio=0.5, seed=options.seed)
+  dataset = resplit(dataset, ratio=options.split, seed=options.seed)
   print("Binarizing data")
   dataset = binarize(dataset)
   print("Ready to train:")
   train(dataset, options)
-
