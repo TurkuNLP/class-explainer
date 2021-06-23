@@ -11,6 +11,8 @@ import numpy as np
 from datasets import load_dataset
 import pickle
 import csv
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+import sys
 
 
 labels = ['HI', 'ID', 'IN', 'IP', 'LY', 'NA', 'OP', 'SP', 'av', 'ds', 'dtp', 'ed', 'en', 'fi', 'it', 'lt', 'mt', 'nb', 'ne', 'ob', 'ra', 're', 'rs', 'rv', 'sr']
@@ -18,6 +20,27 @@ file_name = ".tsv"
 int_bs = 10
 data_name = ""   #path and .pkl already in code
 model_name = ""  #path and .pt already in code
+
+
+def argparser():
+    ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
+    ap.add_argument('--model_name', default=MODEL_NAME,
+                    help='Pretrained model name')
+    ap.add_argument('--data', metavar='FILE', required=True,
+                    help='Path to test datasets')
+    ap.add_argument('--int_batch_size', metavar='INT', type=int,
+                    default=BATCH_SIZE,
+                    help='Batch size for integrated gradients')
+    ap.add_argument('--seed', metavar='INT', type=int,
+                    default=None, help='Random seed for splitting data'))
+    ap.add_argument('--file_name', default=None, metavar='FILE',
+                    help='Path to file and the beginning of the filename')
+    #ap.add_argument('--save_predictions', default=False, action='store_true',
+    #                help='save predictions and labels for dev set, or for test set if provided')
+    return ap
+
+
+
 
 # # Forward on the model -> data in, prediction out, nothing fancy really
 def predict(model, inputs, attention_mask=None):  
@@ -29,7 +52,6 @@ def blank_reference_input(tokenized_input, blank_token_id): #b_encoding is the o
     makes a tuple of blank (input_ids, token_type_ids, attention_mask)
     right now position_ids, and attention_mask simply point to tokenized_input
     """
-  
 
     blank_input_ids=tokenized_input.input_ids.clone().detach()
     blank_input_ids[tokenized_input.special_tokens_mask==0]=blank_token_id #blank out everything which is not special token
@@ -70,7 +92,7 @@ def aggregate(inp,attrs,tokenizer):
     return aggregated
     
 
-def explain(text,model,tokenizer,wrt_class="winner"):
+def explain(text,model,tokenizer,wrt_class="winner", int_bs=10):
     
     # Tokenize and make the blank reference input
     inp = tokenizer(text,return_tensors="pt",return_special_tokens_mask=True,truncation=True).to(model.device)
@@ -92,9 +114,9 @@ def explain(text,model,tokenizer,wrt_class="winner"):
         target = np.array([pl > 0.5 for pl in sigm]).astype(int)
         # get the classifications' indices
         target = np.where(target == 1)
-        # return nothing if no classification was done
+        # return None if no classification was done
         if len(target[0]) == 0:
-            return None, None
+            return None, None, logits
         
     else:
         # not implemented really
@@ -114,7 +136,7 @@ def explain(text,model,tokenizer,wrt_class="winner"):
         aggregated.append(aggregated_tg)
     
     # these are wonky but will have dim numberofpredictions x 1
-    return target,aggregated
+    return target,aggregated,logits
 
 
 def print_aggregated(target,aggregated,real_label):
@@ -142,41 +164,85 @@ def print_scores(target, aggregated, idx):
                 #print(f"{counter}",item['label'],label_enc_rev[target.item()],tok,a_val,sep="\t")
                 print("document_"+str(idx),labels[target],str(tok),a_val,sep="\t")
         
-   
+def remove_NA(d):
+  """ Remove null values and separate multilabel values with comma """
+  if d['label'] == None:
+    d['label'] = np.array('NA')
+  if ' ' in d['label']:
+    d['label'] = ",".join(sorted(d['label'].split()))
+  return d
+
+
+def label_encoding(d):
+  """ Split the multi-labels """
+  d['label'] = np.array(d['label'].split(","))
+  return d
+
+def binarize(dataset):
+    """ Binarize the labels of the data. Fitting based on the whole data. """
+    mlb = MultiLabelBinarizer()
+    mlb.fit([labels])
+    print("Binarizing the labels:")
+    dataset = dataset.map(lambda line: {'label': mlb.transform([line['label']])})
+    return dataset
 
 
 if __name__=="__main__":
+    options = argparser().parse_args(sys.argv[1:])
     tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
-    model = torch.load("../multilabel_explainability/models/"+model_name+".pt")
+    model = torch.load(options.model_name)
     model.to('cuda')
     print("Model loaded succesfully.")
     
-    with open('binarized_data/'+data_name+'.pkl', 'rb') as f:
-        dataset = pickle.load(f)
+    # load the test data
+    dataset = load_dataset(
+              'csv',
+              data_files = {
+                  'en': path+'en/test.tsv-simp.tsv',
+                  'fi': path+'fi/test.tsv-simp.tsv',
+                  'fr': path+'fr/test.tsv-simp.tsv',
+                  'sv': path+'sv/test.tsv-simp.tsv',
+              }, delimiter='\t',
+              column_names=['label', 'sentence']
+              )
     print("Dataset loaded succesfully.")
+    
+    
+    dataset = dataset.map(remove_NA)
+    dataset = dataset.map(label_encoding)
+    dataset = binarize(dataset)
+    
+    
+    print("Ready for explainability")
+   
+    # loop over languages    
+    for key in {'en', 'fi, 'fr', 'sv'}:
         
-        
-    save_matrix = []
+        save_matrix = []
 
-    for i in range(len(dataset['test'])):
-      #print(i)
-      txt = dataset['test']['sentence'][i]
-      lbl = np.nonzero(dataset['test']['label'][i][0])[0]
-      if txt == None:
-         txt = " "   # for empty sentences
-      target, aggregated = explain(txt, model, tokenizer)
-      if target != None:
-         # for all labels and their agg scores
-         for tg, ag in zip(target[0], aggregated):
-           target = tg
-           aggregated = ag
-           for tok,a_val in aggregated[0]:
-             if a_val > 0:    #let's not waste time on irrelevant words
-                line = ['document_'+str(i), str(lbl), target, str(tok), a_val]
-                save_matrix.append(line)
+        for i in range(len(dataset[key])):
+          #print(i)
+          txt = dataset[key]['sentence'][i]
+          lbl = np.nonzero(dataset[key]['label'][i][0])[0]
+          if txt == None:
+             txt = " "   # for empty sentences
+          target, aggregated, logits = explain(txt, model, tokenizer, int_bs=options.int_batch_size)
+          if target != None:
+             # for all labels and their agg scores
+             for tg, ag in zip(target[0], aggregated):
+               target = tg
+               aggregated = ag
+               for tok,a_val in aggregated[0]:
+                    line = ['document_'+str(i), str(lbl), target, str(tok), a_val, logits]
+                    save_matrix.append(line)
+          else:  #for no classification, save none for target and a_val
+             for word in txt.split():
+               line = ['document_'+str(i), str(lbl), None, word, None, logits]  
+               save_matrix.append(line)
 
-    pd.DataFrame(save_matrix).to_csv(file_name, sep="\t")
-    print("Dataset succesfully saved")
+        filename = options.file_name+key+'.tsv'
+        pd.DataFrame(save_matrix).to_csv(filename, sep="\t")
+        print("Dataset "+ key +" succesfully saved")
          
     # nice colours :)
     #print_aggregated(target,aggregated, lbl)
