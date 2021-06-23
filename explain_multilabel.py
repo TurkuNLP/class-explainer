@@ -7,9 +7,10 @@ from transformers import AutoTokenizer
 import captum
 import re
 from datasets import load_dataset
+from sklearn.preprocessing import MultiLabelBinarizer
 import numpy as np
 from datasets import load_dataset
-import pickle
+import pandas as pd
 import csv
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
@@ -195,6 +196,7 @@ if __name__=="__main__":
     print("Model loaded succesfully.")
     
     # load the test data
+    path = options.data
     dataset = load_dataset(
               'csv',
               data_files = {
@@ -237,7 +239,7 @@ if __name__=="__main__":
                     save_matrix.append(line)
           else:  #for no classification, save none for target and a_val
              for word in txt.split():
-               line = ['document_'+str(i), str(lbl), None, word, None, logits]  
+               line = ['document_'+str(i), str(lbl), "None", word, "None", logits]  
                save_matrix.append(line)
 
         filename = options.file_name+key+'.tsv'
