@@ -174,7 +174,7 @@ def remove_sublabels(d):
 def binarize(dataset):
     """ Binarize the labels of the data. Fitting based on the whole data. """
     mlb = MultiLabelBinarizer()
-    mlb.fit(dataset['concat']['label'])
+    mlb.fit([labels])
     print("Binarizing the labels:")
     dataset = dataset.map(lambda line: {'label': mlb.transform([line['label']])})
     return dataset
