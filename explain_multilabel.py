@@ -24,15 +24,15 @@ model_name = ""  #path and .pt already in code
 
 def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-    ap.add_argument('--model_name', default=MODEL_NAME,
+    ap.add_argument('--model_name', default=model_name,
                     help='Pretrained model name')
     ap.add_argument('--data', metavar='FILE', required=True,
                     help='Path to test datasets')
     ap.add_argument('--int_batch_size', metavar='INT', type=int,
-                    default=BATCH_SIZE,
+                    default=int_bs,
                     help='Batch size for integrated gradients')
     ap.add_argument('--seed', metavar='INT', type=int,
-                    default=None, help='Random seed for splitting data'))
+                    default=None, help='Random seed for splitting data')
     ap.add_argument('--file_name', default=None, metavar='FILE',
                     help='Path to file and the beginning of the filename')
     #ap.add_argument('--save_predictions', default=False, action='store_true',
@@ -216,7 +216,7 @@ if __name__=="__main__":
     print("Ready for explainability")
    
     # loop over languages    
-    for key in {'en', 'fi, 'fr', 'sv'}:
+    for key in {'en', 'fi', 'fr', 'sv'}:
         
         save_matrix = []
 
