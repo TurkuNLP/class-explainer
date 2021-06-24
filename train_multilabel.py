@@ -238,7 +238,7 @@ def compute_accuracy(pred):
     threshold = 0.5
     pred_ones = [pl>threshold for pl in y_pred_s]
     true_ones = [tl==1 for tl in y_true]
-    return { 'accuracy': accuracy_score(pred_ones, true_ones) }
+    return { 'accuracy': accuracy_score(true_ones, pred_ones) }
 
 
 
