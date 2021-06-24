@@ -28,6 +28,7 @@ BATCH_SIZE=30
 TRAIN_EPOCHS=2
 MODEL_NAME = 'xlm-roberta-base'
 MAX_DEVIANCE = 0.005
+PATIENCE = 5
 # these are printed out by make_dataset.py
 labels = ['HI', 'ID', 'IN', 'IP', 'LY', 'NA', 'OP', 'SP', 'av', 'ds', 'dtp', 'ed', 'en', 'fi', 'it', 'lt', 'mt', 'nb', 'ne', 'ob', 'ra', 're', 'rs', 'rv', 'sr']
 
@@ -45,6 +46,8 @@ def argparser():
                     help='Number of training epochs')
     ap.add_argument('--lr', '--learning_rate', metavar='FLOAT', type=float,
                     default=LEARNING_RATE, help='Learning rate')
+    ap.add_argument('--patience', metavar='INT', type=int,
+                    default=PATIENCE, help='Early stopping patience')
     ap.add_argument('--split', metavar='FLOAT', type=float,
                     default=None, help='Set fixed train/val data split ratio')
     ap.add_argument('--seed', metavar='INT', type=int,
@@ -276,7 +279,8 @@ def train(dataset, options):
         train_dataset=encoded_dataset['train'],
         eval_dataset=encoded_dataset['validation'],
         tokenizer=tokenizer,
-        compute_metrics=compute_accuracy
+        compute_metrics=compute_accuracy,
+        callbacks = [transformers.EarlyStoppingCallback(early_stopping_patience=options.patience)]
     )
 
   print("Ready to train")
