@@ -124,3 +124,37 @@ for i in range(len(df_list)):
     all_kws.append(np.array(df_list[i]['token']))
 
 all_kws = np.unique(np.array(all_kws).flatten()) 
+
+
+df_full = pd.concat(df_list, ignore_index=True)
+
+keywords = []
+
+
+
+for word in all_kws:
+    #print("in word ", word)
+    counter = 0
+    for i in range(len(df_list)):
+        if word in np.array(df_list[i].token):
+            counter += 1
+    #print("counter is ", counter)
+    if counter >= 0.8*len(df_list):
+        df_sub = df_full[(df_full.token == word)]
+        for label in set(df_sub['pred_label']):
+           df_sub2 = df_sub[df_sub.pred_label == label]
+           if len(df_sub2) >0:
+              fre = len(df_sub2)
+              classes = set(df_sub['pred_label'])
+              mean = df_sub2['rank'].mean()
+              std = df_sub2['rank'].std()
+              min = df_sub2['rank'].min()
+              max = df_sub2['rank'].max()
+              keywords.append([label, word, fre, classes, mean, std, min, max]) 
+        
+df_comp = pd.DataFrame(data=keywords, columns = ['label','word', 'freq', 'class_freq', 'mean', 'std', 'min', 'max'])      
+
+df_comp.sort_values(['label', 'mean'])
+
+
+
