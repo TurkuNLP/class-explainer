@@ -2,6 +2,7 @@ from transformers import AutoTokenizer
 from transformers import AutoModelForSequenceClassification
 from transformers import TrainingArguments
 from transformers import Trainer
+from transformers import EarlyStoppingCallback
 from datasets import load_dataset
 import datasets
 import pickle
@@ -10,7 +11,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
 from torch import cuda
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score
 from sklearn.preprocessing import MultiLabelBinarizer
 import collections
 
@@ -238,7 +239,8 @@ def compute_accuracy(pred):
     threshold = 0.5
     pred_ones = [pl>threshold for pl in y_pred_s]
     true_ones = [tl==1 for tl in y_true]
-    return { 'accuracy': accuracy_score(true_ones, pred_ones) }
+    return { 'accuracy': f1_score(y_true=true_ones, y_pred=pred_ones, average='weighted') }
+    #return { 'accuracy': accuracy_score(true_ones, pred_ones) }
 
 
 
@@ -268,7 +270,7 @@ def train(dataset, options):
         per_device_train_batch_size=options.batch_size,
         num_train_epochs=options.epochs,
         gradient_accumulation_steps=4,
-        save_total_limit=3,
+        save_total_limit=8,
         disable_tqdm=True   ## disable progress bar in training
     )
 
@@ -280,7 +282,7 @@ def train(dataset, options):
         eval_dataset=encoded_dataset['validation'],
         tokenizer=tokenizer,
         compute_metrics=compute_accuracy,
-        callbacks = [transformers.EarlyStoppingCallback(early_stopping_patience=options.patience)]
+        callbacks = [EarlyStoppingCallback(early_stopping_patience=options.patience)]
     )
 
   print("Ready to train")
