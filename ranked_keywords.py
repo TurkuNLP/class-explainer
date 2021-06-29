@@ -36,10 +36,10 @@ def argparser():
 def read_data(data_name):
     """ read the data from a csv and remove null values (no predictions)"""
 
-    data = pd.read_csv(data_name, delimiter = "\t", names = ['document_id', 'real_label', 'pred_label', 'token', 'score'])
+    data = pd.read_csv(data_name, delimiter = "\t", names = ['id','document_id', 'real_label', 'pred_label', 'token', 'score', 'logits'], index_col=False)
     data['token'] = data['token'].str.lower()
-    data['token'] = data['token'].fillna("NaN_")
-    #data.dropna(axis = 0)
+    #data['token'] = data['token'].fillna("NaN_")
+    data.dropna(axis = 0, inplace=True)
 
     return data
 
