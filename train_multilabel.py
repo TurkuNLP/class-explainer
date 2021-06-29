@@ -50,7 +50,7 @@ def argparser():
     ap.add_argument('--patience', metavar='INT', type=int,
                     default=PATIENCE, help='Early stopping patience')
     ap.add_argument('--split', metavar='FLOAT', type=float,
-                    default=None, help='Set fixed train/val data split ratio')
+                    default=None, help='Set fixed train/val data split ratio (e.g. 0.8 to train on 80%)')
     ap.add_argument('--seed', metavar='INT', type=int,
                     default=None, help='Random seed for splitting data')
     ap.add_argument('--checkpoints', default=None, metavar='FILE',
@@ -179,7 +179,7 @@ def binarize(dataset):
     """ Binarize the labels of the data. Fitting based on the whole data. """
     mlb = MultiLabelBinarizer()
     mlb.fit([labels])
-    print("Binarizing the labels:")
+    print("Binarizing the labels")
     dataset = dataset.map(lambda line: {'label': mlb.transform([line['label']])})
     return dataset
 
@@ -254,13 +254,14 @@ def train(dataset, options):
 
   # Model downloading
   num_labels = len(dataset['train']['label'][0][0]) #here double brackets are needed!
-  print("Downloading model")
+  print("Downloading model", flush=True)
   model = AutoModelForSequenceClassification.from_pretrained(options.model_name, num_labels = num_labels)
   tokenizer = AutoTokenizer.from_pretrained(options.model_name)
 
-  print("Tokenizing data")
+  print("Tokenizing data", flush=True)
   encoded_dataset = dataset.map(wrap_tokenizer_fn(tokenizer))
 
+  print("Initializing model", flush=True)
   train_args = TrainingArguments(
         'multilabel_model_checkpoints',    # output directory for checkpoints and predictions
         load_best_model_at_end=True,
@@ -271,7 +272,7 @@ def train(dataset, options):
         num_train_epochs=options.epochs,
         gradient_accumulation_steps=4,
         save_total_limit=8,
-        disable_tqdm=True   ## disable progress bar in training
+        disable_tqdm=False   ## True=disable progress bar in training
     )
 
 
@@ -285,9 +286,10 @@ def train(dataset, options):
         callbacks = [EarlyStoppingCallback(early_stopping_patience=options.patience)]
     )
 
-  print("Ready to train")
+  print("Training", flush=True)
   trainer.train()
   # Evaluate
+  print("Evaluating", flush=True)
   results = trainer.evaluate()
   print('Accuracy:', results["eval_accuracy"])
 
@@ -306,6 +308,8 @@ def train(dataset, options):
   # save the model
   if options.save_model is not None:
       torch.save(trainer.model, options.save_model)#"models/multilabel_model3_fifrsv.pt")
+
+  return model, tokenizer
 
 
 
