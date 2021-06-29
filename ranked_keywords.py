@@ -38,8 +38,8 @@ def read_data(data_name):
 
     data = pd.read_csv(data_name, delimiter = "\t", names = ['document_id', 'real_label', 'pred_label', 'token', 'score'])
     data['token'] = data['token'].str.lower()
-    data['token'] = data['token'].fillna("NaN_")
-    #data.dropna(axis = 0)
+    #data['token'] = data['token'].fillna("NaN_")
+    data.dropna(axis = 0)
 
     return data
 
