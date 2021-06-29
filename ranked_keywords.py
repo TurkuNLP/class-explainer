@@ -2,6 +2,33 @@ import pandas as pd
 import numpy as np
 from scipy.stats import rankdata
 import glob
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+import sys
+
+
+# HYPERPARAMETRES
+CHOOSE_BEST = 10
+DROP_AMBIGUOUS = 3
+FRACTION = 0.8
+SAVE_N = 100
+SAVE_FILE = "keywords.tsv"
+
+
+def argparser():
+    ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
+    ap.add_argument('--data', metavar='FILE', required=True,
+                    help='Path to data. /*.tsv already included in call')
+    ap.add_argument('--choose_best', metavar='INT', type=int,
+                    default=CHOOSE_BEST, help='Number of best words chosen per doc')
+    ap.add_argument('--drop_amb', metavar='INT', type=int, default=DROP_AMBIGUOUS,
+                    help='Upper limit for classes a word can be present in')
+    ap.add_argument('--fraction', metavar='FLOAT', type=float,
+                    default=FRACTION, help='% in how many lists the word must be present in')
+    ap.add_argument('--save_n', metavar='INT', type=int,
+                    default=SAVE_N, help='How many words/class are saved')
+    ap.add_argument('--save_file', default=SAVE_FILE, metavar='FILE',
+                    help='dir+file for saving the results')
+    return ap
 
 
 
@@ -16,18 +43,23 @@ def read_data(data_name):
 
     return data
 
-
 def choose_n_best(data, n):
     """ choose n best scoring words per document """
+    df_new = data.sort_values('score', ascending=False).groupby('document_id').head(n)
+    df_new.sort_index(inplace=True)
+    return df_new
 
-    df_topscores = pd.DataFrame(columns = ['document_id', 'real_label','pred_label','token', 'score'])#, 'logits']) 
-    for doc in (set(data['document_id'])):
-        df = data[data.document_id == doc]
-        df_topscores = pd.concat([df_topscores,df.nlargest(n, 'score')], axis = 0)
-
-    df_topscores.sort_index(inplace=True)
-
-    return df_topscores
+#def choose_n_best(data, n):
+#    """ choose n best scoring words per document """
+#
+#    df_topscores = pd.DataFrame(columns = ['document_id', 'real_label','pred_label','token', 'score'])#, 'logits']) 
+#    for doc in (set(data['document_id'])):
+#        df = data[data.document_id == doc]
+#        df_topscores = pd.concat([df_topscores,df.nlargest(n, 'score')], axis = 0)
+#
+#    df_topscores.sort_index(inplace=True)
+#
+#    return df_topscores
 
 
 def get_frequencies(df_topscores):
@@ -101,60 +133,65 @@ def rank(df_topscores):
     
     df_topscores['rank'] = np.array(ranks)
 
-
-
-
-df_list = []
-
-for filename in glob.glob("*.tsv"):
-    print(filename)
-    df = choose_n_best(read_data(filename),10)
     
-    get_frequencies(df)
-    df = drop_ambiguous_words(df, 3)
     
-    rank(df)
+    
+    
+if __name__=="__main__":
+    options = argparser().parse_args(sys.argv[1:])
 
-    df_list.append(df)
+    # get all data in a list
+    df_list = []
 
-# get all keywords
-all_kws = []
+    for filename in glob.glob(options.data+"/*.tsv"):
+        print(filename)
+        df = choose_n_best(read_data(filename),options.choose_best)
+        get_frequencies(df)
+        df = drop_ambiguous_words(df, options.drop_amb)
+        rank(df)
+        df_list.append(df)
 
-for i in range(len(df_list)):
-    all_kws.append(np.array(df_list[i]['token']))
-
-all_kws = np.unique(np.array(all_kws).flatten()) 
-
-
-df_full = pd.concat(df_list, ignore_index=True)
-
-keywords = []
-
-
-
-for word in all_kws:
-    #print("in word ", word)
-    counter = 0
+    # all keywords present in any list
+    all_kws = []
     for i in range(len(df_list)):
-        if word in np.array(df_list[i].token):
-            counter += 1
-    #print("counter is ", counter)
-    if counter >= 0.8*len(df_list):
-        df_sub = df_full[(df_full.token == word)]
-        for label in set(df_sub['pred_label']):
-           df_sub2 = df_sub[df_sub.pred_label == label]
-           if len(df_sub2) >0:
-              fre = len(df_sub2)
-              classes = set(df_sub['pred_label'])
-              mean = df_sub2['rank'].mean()
-              std = df_sub2['rank'].std()
-              min = df_sub2['rank'].min()
-              max = df_sub2['rank'].max()
-              keywords.append([label, word, fre, classes, mean, std, min, max]) 
-        
-df_comp = pd.DataFrame(data=keywords, columns = ['label','word', 'freq', 'class_freq', 'mean', 'std', 'min', 'max'])      
+        all_kws.append(np.array(df_list[i]['token']))
+    all_kws = np.unique(np.array(all_kws).flatten()) 
 
-df_comp.sort_values(['label', 'mean'])
+    # one concatenated list for calculating statistics
+    df_full = pd.concat(df_list, ignore_index=True)
+
+    # array for the good keywords
+    keywords = []
+
+    for word in all_kws:
+        # counter to see in how many lists the words is in
+        counter = 0
+        # if word in list, counter ++
+        for i in range(len(df_list)):
+            if word in np.array(df_list[i].token):
+                counter += 1
+        # if word was present almost always
+        if counter >= options.fraction*len(df_list):
+            # select those words from full dataframe
+            df_sub = df_full[(df_full.token == word)]
+            # for all labels predicted for that word (max given before)
+            for label in set(df_sub['pred_label']):
+                # get another sub dataframe that has only that label
+                df_sub2 = df_sub[df_sub.pred_label == label]
+                # if there are predictions, calculate statistics
+                if len(df_sub2) >0:
+                  fre = len(df_sub2)
+                  classes = set(df_sub['pred_label'])
+                  mean = df_sub2['rank'].mean()
+                  std = df_sub2['rank'].std()
+                  min = df_sub2['rank'].min()
+                  max = df_sub2['rank'].max()
+                  keywords.append([label, word, fre, classes, mean, std, min, max]) 
+
+    # make a dataframe, sort the keywords wrt label and mean rank
+    df_comp = pd.DataFrame(data=keywords, columns = ['label','word', 'freq', 'class_freq', 'mean', 'std', 'min', 'max'])      
+    df_comp.sort_values(['label', 'mean'], ascending=[True, False], inplace=True)
+    df_save = df_comp.groupby('label').head(options.save_n)
 
 
-
+    df_save.to_csv(options.save_file, sep="\t")
