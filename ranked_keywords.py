@@ -17,7 +17,9 @@ SAVE_FILE = "keywords.tsv"
 def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     ap.add_argument('--data', metavar='FILE', required=True,
-                    help='Path to data. /*.tsv already included in call')
+                    help='Path to data. /* already included in call')
+    ap.add_argument('--language', metavar='FILE', required=True,
+                    help='Language, together with data: data /* language.tsv')
     ap.add_argument('--choose_best', metavar='INT', type=int,
                     default=CHOOSE_BEST, help='Number of best words chosen per doc')
     ap.add_argument('--drop_amb', metavar='INT', type=int, default=DROP_AMBIGUOUS,
@@ -139,10 +141,10 @@ def rank(df_topscores):
 # get all data in a list
 df_list = []
 
-for filename in glob.glob(FILE+"*.tsv"):
+for filename in glob.glob(options.data+"/*"+options.language+".tsv"):
     print(filename)
     df = read_data(filename)
-    df = choose_n_best(df, CHOOSE_BEST)
+    df = choose_n_best(df, options.choose_best)
     #get_frequencies(df)    #these later!!!
     #df = drop_ambiguous_words(df, DROP_AMBIGUOUS)
     rank(df)
@@ -151,7 +153,7 @@ for filename in glob.glob(FILE+"*.tsv"):
 # one concatenated list for calculating statistics, remove bad words here!
 df_full = pd.concat(df_list, ignore_index=True)
 get_frequencies(df_full)
-df_full = drop_ambiguous_words(df_full, DROP_AMBIGUOUS)
+df_full = drop_ambiguous_words(df_full, options.drop_amb)
 
 
 # all keywords present in any list
@@ -175,7 +177,7 @@ for word in all_kws:
             if word in np.array(df_list[i][df_list[i].pred_label == label].token):
                 counter += 1
         # if word was present almost always
-        if counter >= FRACTION*len(df_list):
+        if counter >= options.fraction*len(df_list):
             # get another sub dataframe that has only that label
             df_sub2 = df_sub[df_sub.pred_label == label]
             # if there are predictions, calculate statistics
@@ -191,7 +193,7 @@ for word in all_kws:
 # make a dataframe, sort the keywords wrt label and mean rank
 df_comp = pd.DataFrame(data=keywords, columns = ['label','word', 'freq', 'class_freq', 'mean', 'std', 'min', 'max'])      
 df_comp.sort_values(['label', 'mean'], ascending=[True, False], inplace=True)
-df_save = df_comp.groupby('label').head(SAVE_N)
+df_save = df_comp.groupby('label').head(options.save_n)
 
 #display(df_save)
-df_save.to_csv(SAVE_FILE, sep="\t")
+df_save.to_csv(options.save_file, sep="\t")
