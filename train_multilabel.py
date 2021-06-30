@@ -19,8 +19,13 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
 import random
 
-from datasets.utils.logging import set_verbosity_error
-set_verbosity_error()    ## lisäys
+from transformers.utils.logging import DEBUG as log_level
+from transformers.utils.logging import set_verbosity as model_verbosity
+from datasets.utils.logging import set_verbosity as data_verbosity
+model_verbosity(log_level)
+data_verbosity(log_level)
+#set_verbosity_error()    ## lisäys
+
 
 # Hyperparameters
 tr =  ['en', 'fi', 'fr', 'sv']
@@ -304,12 +309,13 @@ def train(dataset, options):
   true_ones = [tl==1 for tl in t]
 
   print(classification_report(true_ones,pred_ones, target_names = labels))
+  report = classification_report(true_ones,pred_ones, target_names = labels, output_dict=True)
 
   # save the model
   if options.save_model is not None:
       torch.save(trainer.model, options.save_model)#"models/multilabel_model3_fifrsv.pt")
 
-  return model, tokenizer
+  return model, tokenizer, report
 
 
 

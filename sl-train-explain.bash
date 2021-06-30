@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=training
 #SBATCH --account=project_2002026
-#SBATCH --time=20:15:00
+#SBATCH --time=23:15:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=7G
+#SBATCH --mem-per-cpu=32G
 #SBATCH --gres=gpu:v100:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1

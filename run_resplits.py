@@ -3,6 +3,7 @@ import explain_multilabel
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
 import numpy as np
+import json
 
 LEARNING_RATE=1e-4
 BATCH_SIZE=30
@@ -46,13 +47,16 @@ options = argparser().parse_args(sys.argv[1:])
 print("Reading data", flush=True)
 dataset = train_multilabel.read_dataset(options.data)
 print("Splitting data", flush=True)
-#dataset = train_multilabel.resplit(dataset, ratio=options.split, seed=options.seed)
-dataset = train_multilabel.resplit(dataset, ratio=0.05, seed=options.seed)
+dataset = train_multilabel.resplit(dataset, ratio=options.split, seed=options.seed)
+#dataset = train_multilabel.resplit(dataset, ratio=0.05, seed=options.seed)
 print("Binarizing data", flush=True)
 dataset = train_multilabel.binarize(dataset)
 print("Ready to train:", flush=True)
-model, tokenizer = train_multilabel.train(dataset, options)
+model, tokenizer, report = train_multilabel.train(dataset, options)
 
+report_file = options.save_explanations+'.eval.json'
+print("Saving evaluation data to", report_file)
+json.dump(report, open(report_file,'w'))
 
 model.to('cuda')
 print("Model loaded succesfully.")
@@ -62,14 +66,15 @@ print("Ready for explainability", flush=True)
 
 save_matrix = []
 
-for i in range(len(dataset['validation'])):
-  if i % 10 == 0:
-      print("Explaining example", i, flush=True)
+n_examples = len(dataset['validation'])
+for i in range(n_examples):
+  if i % 100 == 0:
+      print("Explaining example %d/%d" % (i, n_examples), flush=True)
   txt = dataset['validation']['sentence'][i]
   lbl = np.nonzero(dataset['validation']['label'][i][0])[0]
   if txt == None:
      txt = " "   # for empty sentences
-  target, aggregated, logits = explain_multilabel.explain(txt, model, tokenizer, int_bs=options.batch_size)
+  target, aggregated, logits = explain_multilabel.explain(txt, model, tokenizer, int_bs=options.batch_size) #add control: n_steps
   if target != None:
      # for all labels and their agg scores
      for tg, ag in zip(target[0], aggregated):
