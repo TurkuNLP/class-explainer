@@ -165,18 +165,17 @@ all_kws = np.unique(np.array(all_kws)).flatten()
 keywords = []
 
 for word in all_kws:
-    # counter to see in how many lists the words is in
-    counter = 0
-    # if word in list, counter ++
-    for i in range(len(df_list)):
-        if word in np.array(df_list[i].token):
-            counter += 1
-    # if word was present FRACTION % of time
-    if counter >= FRACTION*len(df_list):
-        # select those words from full dataframe
-        df_sub = df_full[df_full.token == word]
-        # for all labels predicted for that word (max given before)
-        for label in set(df_sub['pred_label']):
+    # select those words from full dataframe
+    df_sub = df_full[df_full.token == word]
+    # for all labels predicted for that word 
+    for label in set(df_sub['pred_label']):
+        counter = 0
+        # if word in list, counter ++
+        for i in range(len(df_list)):
+            if word in np.array(df_list[i][df_list[i].pred_label == label].token):
+                counter += 1
+        # if word was present almost always
+        if counter >= FRACTION*len(df_list):
             # get another sub dataframe that has only that label
             df_sub2 = df_sub[df_sub.pred_label == label]
             # if there are predictions, calculate statistics
