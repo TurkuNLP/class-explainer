@@ -17,7 +17,9 @@ SAVE_FILE = "keywords.tsv"
 def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     ap.add_argument('--data', metavar='FILE', required=True,
-                    help='Path to data. /*.tsv already included in call')
+                    help='Path to data. /* already included in call')
+    ap.add_argument('--language', metavar='FILE', required=True,
+                    help='Language, together with data: data /* language.tsv')
     ap.add_argument('--choose_best', metavar='INT', type=int,
                     default=CHOOSE_BEST, help='Number of best words chosen per doc')
     ap.add_argument('--drop_amb', metavar='INT', type=int, default=DROP_AMBIGUOUS,
@@ -31,21 +33,20 @@ def argparser():
     return ap
 
 
-
-
 def read_data(data_name):
     """ read the data from a csv and remove null values (no predictions)"""
 
-    data = pd.read_csv(data_name, delimiter = "\t", names = ['id','document_id', 'real_label', 'pred_label', 'token', 'score', 'logits'], index_col=False)
+    data = pd.read_csv(data_name, delimiter = "\t", names = ['id','document_id', 'real_label', 'pred_label', 'token', 'score', 'logits'],index_col=False)
     data['token'] = data['token'].str.lower()
     #data['token'] = data['token'].fillna("NaN_")
-    data.dropna(axis = 0, inplace=True)
+    data.dropna(axis=0, how='any', inplace=True)
+    data = data[data.pred_label != "None"]
 
     return data
 
 def choose_n_best(data, n):
     """ choose n best scoring words per document """
-    df_new = data.sort_values('score', ascending=False).groupby('document_id').head(n)
+    df_new = data.sort_values('score', ascending=False).groupby(['document_id', 'pred_label']).head(n)
     df_new.sort_index(inplace=True)
     return df_new
 
@@ -123,59 +124,60 @@ def rank(df_topscores):
     """ assign ranks to words and add them to the dataframe under rank """
     ranks = []
 
-    for doc_id in range(len(set(df_topscores['document_id']))): 
+    for doc_id in set(df_topscores['document_id']): 
         #print(doc_id)
-        df = df_topscores[df_topscores.document_id == 'document_'+str(doc_id)]['score']
-        
+
+        df = df_topscores[df_topscores.document_id == doc_id]['score']
+        if len(df) == 0:
+          print(doc_id)
         r = rank_f(df,doc_id)
         for item in r:
             ranks.append(item)
     
     df_topscores['rank'] = np.array(ranks)
 
-    
-    
-    
-    
 if __name__=="__main__":
     options = argparser().parse_args(sys.argv[1:])
-
     # get all data in a list
     df_list = []
 
-    for filename in glob.glob(options.data+"/*.tsv"):
+    for filename in glob.glob(options.data+"/*"+options.language+".tsv"):
         print(filename)
-        df = choose_n_best(read_data(filename),options.choose_best)
-        get_frequencies(df)
-        df = drop_ambiguous_words(df, options.drop_amb)
+        df = read_data(filename)
+        df = choose_n_best(df, options.choose_best)
+        #get_frequencies(df)    #these later!!!
+        #df = drop_ambiguous_words(df, DROP_AMBIGUOUS)
         rank(df)
         df_list.append(df)
 
+    # one concatenated list for calculating statistics, remove bad words here!
+    df_full = pd.concat(df_list, ignore_index=True)
+    get_frequencies(df_full)
+    df_full = drop_ambiguous_words(df_full, options.drop_amb)
+
+
     # all keywords present in any list
     all_kws = []
-    for i in range(len(df_list)):
-        all_kws.append(np.array(df_list[i]['token']))
-    all_kws = np.unique(np.array(all_kws).flatten()) 
+    all_kws.append(np.array(df_full['token']))
+    all_kws = np.unique(np.array(all_kws)).flatten()
 
-    # one concatenated list for calculating statistics
-    df_full = pd.concat(df_list, ignore_index=True)
+
 
     # array for the good keywords
     keywords = []
 
     for word in all_kws:
-        # counter to see in how many lists the words is in
-        counter = 0
-        # if word in list, counter ++
-        for i in range(len(df_list)):
-            if word in np.array(df_list[i].token):
-                counter += 1
-        # if word was present almost always
-        if counter >= options.fraction*len(df_list):
-            # select those words from full dataframe
-            df_sub = df_full[(df_full.token == word)]
-            # for all labels predicted for that word (max given before)
-            for label in set(df_sub['pred_label']):
+        # select those words from full dataframe
+        df_sub = df_full[df_full.token == word]
+        # for all labels predicted for that word 
+        for label in set(df_sub['pred_label']):
+            counter = 0
+            # if word in list, counter ++
+            for i in range(len(df_list)):
+                if word in np.array(df_list[i][df_list[i].pred_label == label].token):
+                    counter += 1
+            # if word was present almost always
+            if counter >= options.fraction*len(df_list):
                 # get another sub dataframe that has only that label
                 df_sub2 = df_sub[df_sub.pred_label == label]
                 # if there are predictions, calculate statistics
@@ -186,12 +188,12 @@ if __name__=="__main__":
                   std = df_sub2['rank'].std()
                   min = df_sub2['rank'].min()
                   max = df_sub2['rank'].max()
-                  keywords.append([label, word, fre, classes, mean, std, min, max]) 
+                  keywords.append([int(label), word, fre, classes, mean, std, min, max]) 
 
     # make a dataframe, sort the keywords wrt label and mean rank
     df_comp = pd.DataFrame(data=keywords, columns = ['label','word', 'freq', 'class_freq', 'mean', 'std', 'min', 'max'])      
     df_comp.sort_values(['label', 'mean'], ascending=[True, False], inplace=True)
     df_save = df_comp.groupby('label').head(options.save_n)
 
-
+    #display(df_save)
     df_save.to_csv(options.save_file, sep="\t")
