@@ -136,64 +136,64 @@ def rank(df_topscores):
     
     df_topscores['rank'] = np.array(ranks)
 
+if __name__=="__main__":
+    options = argparser().parse_args(sys.argv[1:])
+    # get all data in a list
+    df_list = []
+
+    for filename in glob.glob(options.data+"/*"+options.language+".tsv"):
+        print(filename)
+        df = read_data(filename)
+        df = choose_n_best(df, options.choose_best)
+        #get_frequencies(df)    #these later!!!
+        #df = drop_ambiguous_words(df, DROP_AMBIGUOUS)
+        rank(df)
+        df_list.append(df)
+
+    # one concatenated list for calculating statistics, remove bad words here!
+    df_full = pd.concat(df_list, ignore_index=True)
+    get_frequencies(df_full)
+    df_full = drop_ambiguous_words(df_full, options.drop_amb)
 
 
-# get all data in a list
-df_list = []
-
-for filename in glob.glob(options.data+"/*"+options.language+".tsv"):
-    print(filename)
-    df = read_data(filename)
-    df = choose_n_best(df, options.choose_best)
-    #get_frequencies(df)    #these later!!!
-    #df = drop_ambiguous_words(df, DROP_AMBIGUOUS)
-    rank(df)
-    df_list.append(df)
-
-# one concatenated list for calculating statistics, remove bad words here!
-df_full = pd.concat(df_list, ignore_index=True)
-get_frequencies(df_full)
-df_full = drop_ambiguous_words(df_full, options.drop_amb)
-
-
-# all keywords present in any list
-all_kws = []
-all_kws.append(np.array(df_full['token']))
-all_kws = np.unique(np.array(all_kws)).flatten()
+    # all keywords present in any list
+    all_kws = []
+    all_kws.append(np.array(df_full['token']))
+    all_kws = np.unique(np.array(all_kws)).flatten()
 
 
 
-# array for the good keywords
-keywords = []
+    # array for the good keywords
+    keywords = []
 
-for word in all_kws:
-    # select those words from full dataframe
-    df_sub = df_full[df_full.token == word]
-    # for all labels predicted for that word 
-    for label in set(df_sub['pred_label']):
-        counter = 0
-        # if word in list, counter ++
-        for i in range(len(df_list)):
-            if word in np.array(df_list[i][df_list[i].pred_label == label].token):
-                counter += 1
-        # if word was present almost always
-        if counter >= options.fraction*len(df_list):
-            # get another sub dataframe that has only that label
-            df_sub2 = df_sub[df_sub.pred_label == label]
-            # if there are predictions, calculate statistics
-            if len(df_sub2) >0:
-              fre = len(df_sub2)
-              classes = set(df_sub['pred_label'])
-              mean = df_sub2['rank'].mean()
-              std = df_sub2['rank'].std()
-              min = df_sub2['rank'].min()
-              max = df_sub2['rank'].max()
-              keywords.append([int(label), word, fre, classes, mean, std, min, max]) 
-        
-# make a dataframe, sort the keywords wrt label and mean rank
-df_comp = pd.DataFrame(data=keywords, columns = ['label','word', 'freq', 'class_freq', 'mean', 'std', 'min', 'max'])      
-df_comp.sort_values(['label', 'mean'], ascending=[True, False], inplace=True)
-df_save = df_comp.groupby('label').head(options.save_n)
+    for word in all_kws:
+        # select those words from full dataframe
+        df_sub = df_full[df_full.token == word]
+        # for all labels predicted for that word 
+        for label in set(df_sub['pred_label']):
+            counter = 0
+            # if word in list, counter ++
+            for i in range(len(df_list)):
+                if word in np.array(df_list[i][df_list[i].pred_label == label].token):
+                    counter += 1
+            # if word was present almost always
+            if counter >= options.fraction*len(df_list):
+                # get another sub dataframe that has only that label
+                df_sub2 = df_sub[df_sub.pred_label == label]
+                # if there are predictions, calculate statistics
+                if len(df_sub2) >0:
+                  fre = len(df_sub2)
+                  classes = set(df_sub['pred_label'])
+                  mean = df_sub2['rank'].mean()
+                  std = df_sub2['rank'].std()
+                  min = df_sub2['rank'].min()
+                  max = df_sub2['rank'].max()
+                  keywords.append([int(label), word, fre, classes, mean, std, min, max]) 
 
-#display(df_save)
-df_save.to_csv(options.save_file, sep="\t")
+    # make a dataframe, sort the keywords wrt label and mean rank
+    df_comp = pd.DataFrame(data=keywords, columns = ['label','word', 'freq', 'class_freq', 'mean', 'std', 'min', 'max'])      
+    df_comp.sort_values(['label', 'mean'], ascending=[True, False], inplace=True)
+    df_save = df_comp.groupby('label').head(options.save_n)
+
+    #display(df_save)
+    df_save.to_csv(options.save_file, sep="\t")
