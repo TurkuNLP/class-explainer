@@ -225,6 +225,7 @@ if __name__=="__main__":
         for i in range(len(dataset[key])):
           #print(i)
           txt = dataset[key]['sentence'][i]
+          txt = [re.sub("[0-9]","N",t) for t in txt]  #punc white space
           lbl = np.nonzero(dataset[key]['label'][i][0])[0]
           if txt == None:
              txt = " "   # for empty sentences
