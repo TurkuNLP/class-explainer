@@ -5,7 +5,7 @@
 #SBATCH --partition=gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=32G
+#SBATCH --mem-per-cpu=16G
 #SBATCH --gres=gpu:v100:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -28,7 +28,7 @@ srun python run_resplits.py \
   --lr 7.5e-5 \
   --epochs 12 \
   --batch_size 30 \
-  --split 0.5 \
+  --split 0.66 \
   --patience 3 \
   --save_explanations $1 \
   --seed $2

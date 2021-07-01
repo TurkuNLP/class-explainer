@@ -88,7 +88,7 @@ def get_label_counts(dataset):
             label_counts[label] += 1
     return label_counts
 
-def resplit(dataset, ratio=None, seed=None):
+def resplit(dataset, ratio=0.5, seed=None):
     """ Shuffle and resplit train and validation sets """
 
     # get all labels for comparison
@@ -96,10 +96,6 @@ def resplit(dataset, ratio=None, seed=None):
 
     if seed is not None:
         random.seed(seed)
-
-    # If no ratio is given -> 0.5
-    if ratio is None:
-        ratio = 0.5
 
     while True:
         # We shuffle the save data in concat
