@@ -44,8 +44,8 @@ def argparser():
 
 
 # # Forward on the model -> data in, prediction out, nothing fancy really
-def predict(model, inputs, attention_mask=None):  
-    pred=model(inputs, attention_mask=attention_mask)      
+def predict(model, inputs, attention_mask=None):
+    pred=model(inputs, attention_mask=attention_mask) # TODO: batch_size?
     return pred.logits #return the output of the classification layer
 
 def blank_reference_input(tokenized_input, blank_token_id): #b_encoding is the output of HFace tokenizer
@@ -56,7 +56,7 @@ def blank_reference_input(tokenized_input, blank_token_id): #b_encoding is the o
 
     blank_input_ids=tokenized_input.input_ids.clone().detach()
     blank_input_ids[tokenized_input.special_tokens_mask==0]=blank_token_id #blank out everything which is not special token
-    return blank_input_ids, tokenized_input.attention_mask       
+    return blank_input_ids, tokenized_input.attention_mask
 
 def summarize_attributions(attributions):
     attributions = attributions.sum(dim=-1).squeeze(0)
@@ -78,7 +78,7 @@ def aggregate(inp,attrs,tokenizer):
             if token == "<s>" or token == "</s>":  # special tokens
                 res.append((token,a_val))
             elif token.startswith("▁"):
-                #This NOT is a continuation. A NEW word. 
+                #This NOT is a continuation. A NEW word.
                 res.append((token[1:],a_val))
                 #print(res)
             else:  # we're continuing a word and need to choose the larger abs value of the two
@@ -87,23 +87,23 @@ def aggregate(inp,attrs,tokenizer):
                 if abs(a_val)<abs(last_a_val): #past value bigger
                     res[-1]=(res[-1][0]+token, last_a_val)
                 else:  #new value bigger
-                    res[-1]=(res[-1][0]+token, a_val) 
-          
+                    res[-1]=(res[-1][0]+token, a_val)
+
         aggregated.append(res)
     return aggregated
-    
 
-def explain(text,model,tokenizer,wrt_class="winner", int_bs=10):
-    
+
+def explain(text,model,tokenizer,wrt_class="winner", int_bs=10, n_steps=50):
+
     # Tokenize and make the blank reference input
     inp = tokenizer(text,return_tensors="pt",return_special_tokens_mask=True,truncation=True).to(model.device)
     b_input_ids, b_attention_mask=blank_reference_input(inp, tokenizer.convert_tokens_to_ids("-"))
-  
 
-    def predict_f(inputs, attention_mask=None):       
-        return predict(model,inputs,attention_mask)   
-    
-    lig = LayerIntegratedGradients(predict_f, model.roberta.embeddings) 
+
+    def predict_f(inputs, attention_mask=None):
+        return predict(model,inputs,attention_mask)
+
+    lig = LayerIntegratedGradients(predict_f, model.roberta.embeddings)
     if wrt_class=="winner":
         # make a prediction
         prediction=predict(model,inp.input_ids, inp.attention_mask)
@@ -118,24 +118,24 @@ def explain(text,model,tokenizer,wrt_class="winner", int_bs=10):
         # return None if no classification was done
         if len(target[0]) == 0:
             return None, None, logits
-        
+
     else:
         # not implemented really
         target = wrt_class
-    
-   
+
+
     aggregated = []
     # loop over the targets
     for tg in target[0]:
-        attrs, delta= lig.attribute(inputs=(inp.input_ids,inp.attention_mask),         
-                                     baselines=(b_input_ids,b_attention_mask),         
-                                     return_convergence_delta=True,target=tuple([np.array(tg)]),internal_batch_size=int_bs)
+        attrs, delta= lig.attribute(inputs=(inp.input_ids,inp.attention_mask),
+                                     baselines=(b_input_ids,b_attention_mask),
+                                     return_convergence_delta=True,target=tuple([np.array(tg)]),internal_batch_size=int_bs,n_steps=n_steps)
         # append the calculated and normalized scores to aggregated
         attrs_sum = attrs.sum(dim=-1)
         attrs_sum = attrs_sum/torch.norm(attrs_sum)
         aggregated_tg=aggregate(inp,attrs_sum,tokenizer)
         aggregated.append(aggregated_tg)
-    
+
     # these are wonky but will have dim numberofpredictions x 1
     return target,aggregated,logits
 
@@ -151,7 +151,7 @@ def print_aggregated(target,aggregated,real_label):
         print(f"<b>prediction: {labels[tg[0]]}, real label: {real_label}</b>")
         print(f"""<table style="border:solid;">{x}</table>""")
     print("</body></html>")
-    
+
 def print_scores(target, aggregated, idx):
     """"
     Prints doc_id, label, token and agg score
@@ -164,7 +164,7 @@ def print_scores(target, aggregated, idx):
             if a_val > 0.05:
                 #print(f"{counter}",item['label'],label_enc_rev[target.item()],tok,a_val,sep="\t")
                 print("document_"+str(idx),labels[target],str(tok),a_val,sep="\t")
-        
+
 def remove_NA(d):
   """ Remove null values and separate multilabel values with comma """
   if d['label'] == None:
@@ -194,7 +194,7 @@ if __name__=="__main__":
     model = torch.load(options.model_name)
     model.to('cuda')
     print("Model loaded succesfully.")
-    
+
     # load the test data
     path = options.data
     dataset = load_dataset(
@@ -208,18 +208,18 @@ if __name__=="__main__":
               column_names=['label', 'sentence']
               )
     print("Dataset loaded succesfully.")
-    
-    
+
+
     dataset = dataset.map(remove_NA)
     dataset = dataset.map(label_encoding)
     dataset = binarize(dataset)
-    
-    
+
+
     print("Ready for explainability")
-   
-    # loop over languages    
+
+    # loop over languages
     for key in {'en', 'fi', 'fr', 'sv'}:
-        
+
         save_matrix = []
 
         for i in range(len(dataset[key])):
@@ -239,12 +239,12 @@ if __name__=="__main__":
                     save_matrix.append(line)
           else:  #for no classification, save none for target and a_val
              for word in txt.split():
-               line = ['document_'+str(i), str(lbl), "None", word, "None", logits]  
+               line = ['document_'+str(i), str(lbl), "None", word, "None", logits]
                save_matrix.append(line)
 
         filename = options.file_name+key+'.tsv'
         pd.DataFrame(save_matrix).to_csv(filename, sep="\t")
         print("Dataset "+ key +" succesfully saved")
-         
+
     # nice colours :)
     #print_aggregated(target,aggregated, lbl)
