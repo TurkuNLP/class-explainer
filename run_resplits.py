@@ -75,7 +75,7 @@ for i in range(n_examples):
     lbl = np.nonzero(dataset['validation']['label'][i][0])[0]
     if txt == None:
         txt = " "   # for empty sentences
-    target, aggregated, logits = explain_multilabel.explain(txt, model, tokenizer, int_bs=options.batch_size, n_steps=options.batch_size)
+    target, aggregated, logits = explain_multilabel.explain(txt, model, tokenizer, int_bs=options.batch_size, n_steps=options.batch_size) #bs 44, nsteps 22?
     if target != None:
         # for all labels and their agg scores
         for tg, ag in zip(target[0], aggregated):
@@ -83,15 +83,15 @@ for i in range(n_examples):
             aggregated = ag
             for tok,a_val in aggregated[0]:
                 line = ['document_'+str(i), str(lbl), target, str(tok), a_val, logits]
-            save_matrix.append(line)
+                save_matrix.append(line)
     else:  #for no classification, save none for target and a_val
         for word in txt.split():
             line = ['document_'+str(i), str(lbl), "None", word, "None", logits]
             save_matrix.append(line)
     if i % 1000 == 999:
-        pd.DataFrame(save_matrix).to_csv(options.save_explanations, sep="\t")
+        pd.DataFrame(save_matrix).to_csv(options.save_explanations+'.tsv', sep="\t")
 
-pd.DataFrame(save_matrix).to_csv(options.save_explanations, sep="\t")
+pd.DataFrame(save_matrix).to_csv(options.save_explanations+'.tsv', sep="\t")
 print("Explanations succesfully saved")
 
 # nice colours :)

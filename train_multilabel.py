@@ -7,6 +7,7 @@ from datasets import load_dataset
 import datasets
 import pickle
 import sys
+import re
 import torch
 from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
 from torch import cuda
@@ -155,6 +156,11 @@ def sample_dataset(d,n,sample):
     return d
 
 
+def preprocess_text(d):
+    # Separate punctuations from words by whitespace
+    d['sentence'] = re.sub(r"([\.,:;\!\?\"\(\)])([\w\d])", r"\1 \2", re.sub(r"([\.,:;\!\?\"\(\)])([\w\d])", r"\1 \2", d['sentence']))
+    return d
+
 def remove_NA(d):
   """ Remove null values and separate multilabel values with comma """
   if d['label'] == None:
@@ -204,6 +210,7 @@ def read_dataset(path):
   # Remove errors and format the labels
   dataset = dataset.map(remove_NA)
   dataset = dataset.map(label_encoding)
+  dataset = dataset.map(preprocess_text)
 
   # get the label distribution of the whole data
   label_counts = get_label_counts(dataset['concat'])
@@ -264,15 +271,16 @@ def train(dataset, options):
 
   print("Initializing model", flush=True)
   train_args = TrainingArguments(
-        'multilabel_model_checkpoints',    # output directory for checkpoints and predictions
+        options.save_model+'-ckpt',    # output directory for checkpoints and predictions
         load_best_model_at_end=True,
         evaluation_strategy='epoch',
         logging_strategy='epoch',
         learning_rate=options.lr,
         per_device_train_batch_size=options.batch_size,
+        per_device_eval_batch_size=options.batch_size,
         num_train_epochs=options.epochs,
         gradient_accumulation_steps=4,
-        save_total_limit=8,
+        save_total_limit=options.patience+1,
         disable_tqdm=False   ## True=disable progress bar in training
     )
 
@@ -288,11 +296,12 @@ def train(dataset, options):
     )
 
   print("Training", flush=True)
-  trainer.train()
+  if options.epochs > 0:
+      trainer.train()
   # Evaluate
   print("Evaluating", flush=True)
-  results = trainer.evaluate()
-  print('Accuracy:', results["eval_accuracy"])
+  #results = trainer.evaluate()
+  #print('Accuracy:', results["eval_accuracy"])
 
   # for classification report: get predictions
   val_predictions = trainer.predict(encoded_dataset['validation'])
@@ -308,8 +317,8 @@ def train(dataset, options):
   report = classification_report(true_ones,pred_ones, target_names = labels, output_dict=True)
 
   # save the model
-  if options.save_model is not None:
-      torch.save(trainer.model, options.save_model)#"models/multilabel_model3_fifrsv.pt")
+  #if options.save_model is not None:
+  #   torch.save(trainer.model, options.save_model)#"models/multilabel_model3_fifrsv.pt")
 
   return model, tokenizer, report
 

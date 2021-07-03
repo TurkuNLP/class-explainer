@@ -28,9 +28,13 @@ srun python run_resplits.py \
   --lr 7.5e-5 \
   --epochs 12 \
   --batch_size 30 \
-  --split 0.66 \
-  --patience 3 \
-  --save_explanations $1 \
+  --split 0.67 \
+  --patience 1 \
+  --save_explanations explanations/$1 \
+  --save_model models/$1 \
   --seed $2
+
+rm -vrf models/$1-ckpt
+gzip explanations/$1.tsv
 
 seff $SLURM_JOBID
