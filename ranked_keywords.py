@@ -44,6 +44,19 @@ def read_data(data_name):
 
     return data
 
+def remove_false_predictions(data):
+    """ remove all false predictions """
+    drop_column = []
+    for index, row in data.iterrows():
+        if (row['pred_label'] in row['real_label']):
+            drop_column.append(True)
+        else:
+            drop_column.append(False)
+    data['drop_column'] = drop_column
+    new_data = data[data.drop_column == True]
+    new_data.drop(['drop_column'], axis=1, inplace=True)
+    return new_data
+
 def choose_n_best(data, n):
     """ choose n best scoring words per document """
     df_new = data.sort_values('score', ascending=False).groupby(['document_id', 'pred_label']).head(n)
@@ -144,6 +157,7 @@ if __name__=="__main__":
     for filename in glob.glob(options.data+"/*"+options.language+".tsv"):
         print(filename)
         df = read_data(filename)
+        df = remove_false_predictions(df)
         df = choose_n_best(df, options.choose_best)
         #get_frequencies(df)    #these later!!!
         #df = drop_ambiguous_words(df, DROP_AMBIGUOUS)

@@ -75,7 +75,7 @@ def aggregate(inp,attrs,tokenizer):
         res=[]
         #print(token_list)
         for token,a_val in zip(token_list,attr_list):
-            if token == "<s>":# or token == "</s>":  # special tokens # ignore </s>, but keep <s> to avoid crash
+            if token == "<s>" or token == "</s>":  # special tokens
                 res.append((token,a_val))
             elif token.startswith("▁"):
                 #This NOT is a continuation. A NEW word.
@@ -95,11 +95,8 @@ def aggregate(inp,attrs,tokenizer):
 
 def explain(text,model,tokenizer,wrt_class="winner", int_bs=10, n_steps=50):
     # white space inbetween punctuation
-    #text = [re.sub("[0-9]","N",t) for t in text]
-    #text = ''.join([re.sub("[0-9]","N",t) for t in text])
-    
+    text = re.sub('(?<! )(?=[:.,!?()])|(?<=[:.,!?()])(?! )', r' ', text) 
     # Tokenize and make the blank reference input
-    #inp = tokenizer(text,return_tensors="pt",return_special_tokens_mask=True,truncation=True,padding=True).to(model.device)
     inp = tokenizer(text,return_tensors="pt",return_special_tokens_mask=True,truncation=True).to(model.device)
     b_input_ids, b_attention_mask=blank_reference_input(inp, tokenizer.convert_tokens_to_ids("-"))
 
