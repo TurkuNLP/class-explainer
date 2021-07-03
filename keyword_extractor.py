@@ -170,9 +170,9 @@ if __name__=="__main__":
     df_list = []
 
     num_files = 0
-    for filename in glob.glob(options.data+"/*"+options.language+".tsv"):
+    for filename in glob.glob(options.data+"*.tsv"):
         num_files += 1
-        print(filename)
+        print(filename, flush = True)
         df = read_data(filename)
         df.drop(['id'], axis=1, inplace=True)
         #df = df[df.pred_label in df.real_label]
@@ -184,6 +184,7 @@ if __name__=="__main__":
         df['source'] = filename
         df_list.append(df)
     
+    print("All downloaded", flush = True)
     df_full = pd.concat(df_list)
 
 
@@ -242,6 +243,6 @@ if __name__=="__main__":
     #print(df_save[df_save.pred_label == "2"])
     #print(df_save[df_save.pred_label == "3"])
 
-
+    print("Saving results", flush = True)
     df_save.to_csv(options.save_file, sep="\t")
     
