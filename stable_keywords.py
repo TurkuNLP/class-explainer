@@ -96,9 +96,9 @@ if __name__=="__main__":
     df_list = []
 
     num_files = 0
-    for filename in glob.glob(options.data+"/*"+options.language+".tsv"):
+    for filename in  glob.glob(options.data+"*.tsv"):
         num_files += 1
-        print(filename)
+        print(filename, flush = True)
         df = read_data(filename)
         df.drop(['id'], axis=1, inplace=True)
         #df = df[df.pred_label in df.real_label]
@@ -110,6 +110,7 @@ if __name__=="__main__":
         df_list.append(df)
     
     df_full = pd.concat(df_list)
+    print(All downloaded", flush = True)
 
 
     all_lbs = []
