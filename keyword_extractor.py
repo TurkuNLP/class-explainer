@@ -83,9 +83,9 @@ def choose_n_best(data, n):
 
 
 def get_frequencies(df_topscores):
-    """ calculate the frequencies of each word and append them to the dataframe under freq """
+    """ calculate the frequencies of each word-label combination and append them to the dataframe under freq """
 
-    freq_df = df_topscores.groupby('token').count()
+    freq_df = df_topscores.groupby(['token']).count()
 
     frequencies = []
     index = 0
@@ -178,8 +178,7 @@ if __name__=="__main__":
         #df = df[df.pred_label in df.real_label]
         df = remove_false_predictions(df)
         df = choose_n_best(df, options.choose_best)
-        print(df)
-        #get_frequencies(df)     #this is not actually used at all
+        
         get_classfrequencies(df)
         rank(df)
         df['source'] = filename
@@ -220,19 +219,29 @@ if __name__=="__main__":
             df_sub = df_full[(df_full.token == word)&(df_full.pred_label == label)]
             # check if word+prediction in sufficiently many model predictions:
             if len(set(df_sub['source'])) >= options.fraction*num_files:
+                df_sub['freq'] = len(set(df_sub['source']))
                 a = df_sub['rank'].quantile(options.quantile)
                 b = df_sub['rank'].quantile(1-options.quantile)
+                #if len(save_list) < 5:
+                #    print("Quantiles: ", a, b)
+                #    print(df_sub)
                 df_sub = df_sub.drop(df_sub.index[(df_sub['rank'] < a)])
                 df_sub = df_sub.drop(df_sub.index[(df_sub['rank'] > b)])
+                #if len(save_list) < 5:
+                #    print(df_sub)
                 save_list.append(df_sub)
     
     
     df_comp = pd.concat(save_list)
     df_comp.sort_values(['pred_label', 'rank'], ascending=[True, False], inplace=True)
     df_save = df_comp.groupby('pred_label').head(options.save_n)
+    df_save.drop(['logits','source','class_set'], axis = 1, inplace=True)
+   
+    #print(df_save[df_save.pred_label == "0"])
+    #print(df_save[df_save.pred_label == "1"])
+    #print(df_save[df_save.pred_label == "2"])
+    #print(df_save[df_save.pred_label == "3"])
 
-    print(df_save)
+
     df_save.to_csv(options.save_file, sep="\t")
-                 
-
     
