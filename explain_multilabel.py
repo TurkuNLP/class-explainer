@@ -95,7 +95,7 @@ def aggregate(inp,attrs,tokenizer):
 
 def explain(text,model,tokenizer,wrt_class="winner", int_bs=10, n_steps=50):
     # white space inbetween punctuation
-    text = [re.sub("[0-9]","N",t) for t in text] 
+    text = re.sub('(?<! )(?=[:.,!?()])|(?<=[:.,!?()])(?! )', r' ', text) 
     # Tokenize and make the blank reference input
     inp = tokenizer(text,return_tensors="pt",return_special_tokens_mask=True,truncation=True).to(model.device)
     b_input_ids, b_attention_mask=blank_reference_input(inp, tokenizer.convert_tokens_to_ids("-"))
