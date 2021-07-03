@@ -154,9 +154,9 @@ if __name__=="__main__":
     # get all data in a list
     df_list = []
 
-    for filename in glob.glob(options.data+"/*"+options.language+".tsv"):
+    for filename in glob.glob(options.data+"*.tsv"):
         print(filename)
-        df = read_data(filename)
+        df = read_data(filename, flush = True)
         df = remove_false_predictions(df)
         df = choose_n_best(df, options.choose_best)
         #get_frequencies(df)    #these later!!!
@@ -168,6 +168,7 @@ if __name__=="__main__":
     df_full = pd.concat(df_list, ignore_index=True)
     get_frequencies(df_full)
     df_full = drop_ambiguous_words(df_full, options.drop_amb)
+    print("All downloaded and preprocessed", flush = True)
 
 
     # all keywords present in any list
