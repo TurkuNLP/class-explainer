@@ -20,7 +20,7 @@ def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     ap.add_argument('--data', metavar='FILE', required=True,
                     help='Path to data. /* already included in call')
-    ap.add_argument('--language', metavar='FILE', required=True,
+    ap.add_argument('--language', metavar='FILE', default="",
                     help='Language, together with data: data /* language.tsv')
     ap.add_argument('--choose_best', metavar='INT', type=int,
                     default=CHOOSE_BEST, help='Number of best words chosen per doc')
@@ -30,6 +30,8 @@ def argparser():
                     default=FRACTION, help='% in how many lists the word must be present in')
     ap.add_argument('--quantile',metavar='FLOAT', type=float,
                     default=QUANTILE, help='Quantile for dropping words')
+    ap.add_argument('--drop_false_predictions',metavar='INT', type=int,
+                    default=1, help='Whether or not to drop false predictions, 0/1')
     ap.add_argument('--save_n', metavar='INT', type=int,
                     default=SAVE_N, help='How many words/class are saved')
     ap.add_argument('--save_file', default=SAVE_FILE, metavar='FILE',
@@ -91,26 +93,29 @@ def get_classfrequencies(df_topscores):
     df_topscores['class_set'] = label_set
 
 if __name__=="__main__":
+    print("stable_keywords.py",flush = True)
     options = argparser().parse_args(sys.argv[1:])
+    print(options, flush = True)
     # get all data in a list
     df_list = []
 
     num_files = 0
-    for filename in  glob.glob(options.data+"*.tsv"):
+    for filename in glob.glob(options.data+"*.tsv"):
         num_files += 1
         print(filename, flush = True)
         df = read_data(filename)
         df.drop(['id'], axis=1, inplace=True)
+        df['score'] = pd.to_numeric(df['score'])
         #df = df[df.pred_label in df.real_label]
-        df = remove_false_predictions(df)
+        if options.drop_false_predictions==1:
+            df = remove_false_predictions(df)
+            print("False predictions removed",flush = True)
         df = choose_n_best(df, options.choose_best)
         get_classfrequencies(df)
         df['source'] = filename
-        df['score'] = pd.to_numeric(df['score'])
         df_list.append(df)
-    
+
     df_full = pd.concat(df_list)
-    print(All downloaded", flush = True)
 
 
     all_lbs = []
@@ -122,7 +127,7 @@ if __name__=="__main__":
         df_l = df_full[df_full.pred_label == label]
         all_kws = set(df_l['token'])
         kw.append(all_kws)
-    
+    print("Looping over keywords", flush = True)
     save_list = []
     for label, wordlist in zip(all_lbs, kw):
         for word in wordlist:
@@ -131,11 +136,12 @@ if __name__=="__main__":
             if len(set(df_sub['source'])) >= options.fraction*num_files:
                 df_sub['freq'] = len(set(df_sub['source']))
                 save_list.append(df_sub)
-
+    
     df_save = pd.concat(save_list)
-    df_save.drop(['logits','source'], axis = 1, inplace=True)
     df_save.sort_values(['pred_label', 'freq', 'score'], ascending=[True, False, False], inplace=True)
     df_save.drop_duplicates(subset=['token', 'pred_label'], keep="first", inplace=True)
-
-    print(df_save[df_save.pred_label == "0"])
-    #df_save.to_csv(options.save_file, sep="\t")
+    df_save.drop(['logits','source'], axis=1, inplace=True)
+    
+    #print(df_save)
+    df_save.to_csv(options.save_file, sep="\t")
+    print("Saved succesfully", flush = True)
