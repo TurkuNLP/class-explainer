@@ -20,7 +20,7 @@ def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     ap.add_argument('--data', metavar='FILE', required=True,
                     help='Path to data. /* already included in call')
-    ap.add_argument('--language', metavar='FILE', required=True,
+    ap.add_argument('--language', metavar='FILE', default = "",
                     help='Language, together with data: data /* language.tsv')
     ap.add_argument('--choose_best', metavar='INT', type=int,
                     default=CHOOSE_BEST, help='Number of best words chosen per doc')
@@ -30,6 +30,8 @@ def argparser():
                     default=FRACTION, help='% in how many lists the word must be present in')
     ap.add_argument('--quantile',metavar='FLOAT', type=float,
                     default=QUANTILE, help='Quantile for dropping words')
+    ap.add_argument('--drop_false_predictions',metavar='INT', type=int,
+                    default=1, help='Whether or not to drop false predictions, 0/1')
     ap.add_argument('--save_n', metavar='INT', type=int,
                     default=SAVE_N, help='How many words/class are saved')
     ap.add_argument('--save_file', default=SAVE_FILE, metavar='FILE',
@@ -83,9 +85,9 @@ def choose_n_best(data, n):
 
 
 def get_frequencies(df_topscores):
-    """ calculate the frequencies of each word-label combination and append them to the dataframe under freq """
+    """ calculate the frequencies of each word and append them to the dataframe under freq """
 
-    freq_df = df_topscores.groupby(['token']).count()
+    freq_df = df_topscores.groupby('token').count()
 
     frequencies = []
     index = 0
@@ -133,10 +135,13 @@ def lin(x):
 
     maxim = max(x)  # x_1 3 -> y_1 1
     minim = min(x)   # x_0 1  -> y_0 0
-    k = 1.0/(maxim-minim)
-    # y-y_0 = k*(x-x_0)
-    # y = k*(x-x0) +y_0 
-    return np.array(k*(x-minim)+0)
+    if maxim == minim:
+        return np.array(0.5*x)
+    else:
+        k = 1.0/(maxim-minim)
+        # y-y_0 = k*(x-x_0)
+        # y = k*(x-x0) +y_0 
+        return np.array(k*(x-minim)+0)
   
 
 
@@ -165,7 +170,9 @@ def rank(df_topscores):
     df_topscores['rank'] = np.array(ranks)
 
 if __name__=="__main__":
+    print("keyword_extractor.py",flush = True)
     options = argparser().parse_args(sys.argv[1:])
+    print(options,flush = True)
     # get all data in a list
     df_list = []
 
@@ -175,34 +182,19 @@ if __name__=="__main__":
         print(filename, flush = True)
         df = read_data(filename)
         df.drop(['id'], axis=1, inplace=True)
-        #df = df[df.pred_label in df.real_label]
-        df = remove_false_predictions(df)
+        if options.drop_false_predictions==1:
+            df = remove_false_predictions(df)
+            print("False predictions removed",flush = True)
         df = choose_n_best(df, options.choose_best)
-        
+        df['score'] = pd.to_numeric(df['score'])
         get_classfrequencies(df)
         rank(df)
         df['source'] = filename
         df_list.append(df)
     
-    print("All downloaded", flush = True)
     df_full = pd.concat(df_list)
 
 
-    # 1) we want to identify which words are stable across many runs, 
-    # and which happen to get a high ranking due to non-representative split, and 
-    # 2) we might want to keep some sense of relative importance within the list, 
-    # after filtering out spurious words
-
-
-    ##### STABLE ACROSS RUNS ######
-    ##### -> Present almost always (fraction %)  #####
-
-    #get_sourcefrequencies(df_full)
-    #print(df_full)
-    
-    #all_kws = []
-    #all_kws.append(np.array(df_full['token']))
-    #all_kws = np.unique(np.array(all_kws)).flatten()
 
     all_lbs = []
     all_lbs.append(np.array(df_full['pred_label']))
@@ -214,35 +206,29 @@ if __name__=="__main__":
         all_kws = set(df_l['token'])
         kw.append(all_kws)
     
+    print("Looping over keywords",flush = True)
     save_list = []
     for label, wordlist in zip(all_lbs, kw):
         for word in wordlist:
             df_sub = df_full[(df_full.token == word)&(df_full.pred_label == label)]
             # check if word+prediction in sufficiently many model predictions:
             if len(set(df_sub['source'])) >= options.fraction*num_files:
-                df_sub['freq'] = len(set(df_sub['source']))
                 a = df_sub['rank'].quantile(options.quantile)
                 b = df_sub['rank'].quantile(1-options.quantile)
-                #if len(save_list) < 5:
-                #    print("Quantiles: ", a, b)
-                #    print(df_sub)
                 df_sub = df_sub.drop(df_sub.index[(df_sub['rank'] < a)])
                 df_sub = df_sub.drop(df_sub.index[(df_sub['rank'] > b)])
-                #if len(save_list) < 5:
-                #    print(df_sub)
                 save_list.append(df_sub)
     
     
     df_comp = pd.concat(save_list)
     df_comp.sort_values(['pred_label', 'rank'], ascending=[True, False], inplace=True)
     df_save = df_comp.groupby('pred_label').head(options.save_n)
-    df_save.drop(['logits','source','class_set'], axis = 1, inplace=True)
-   
-    #print(df_save[df_save.pred_label == "0"])
-    #print(df_save[df_save.pred_label == "1"])
-    #print(df_save[df_save.pred_label == "2"])
-    #print(df_save[df_save.pred_label == "3"])
+    df_save.drop(['logits', 'source'], axis=1, inplace=True)
 
-    print("Saving results", flush = True)
+    #print(df_save)
     df_save.to_csv(options.save_file, sep="\t")
+    print("Saved succesfully",flush = True)             
+
+    
+
     
