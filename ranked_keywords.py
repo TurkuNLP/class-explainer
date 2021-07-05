@@ -18,7 +18,7 @@ def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     ap.add_argument('--data', metavar='FILE', required=True,
                     help='Path to data. /* already included in call')
-    ap.add_argument('--language', metavar='FILE', required=True,
+    ap.add_argument('--language', metavar='FILE', default = "",
                     help='Language, together with data: data /* language.tsv')
     ap.add_argument('--choose_best', metavar='INT', type=int,
                     default=CHOOSE_BEST, help='Number of best words chosen per doc')
@@ -26,6 +26,8 @@ def argparser():
                     help='Upper limit for classes a word can be present in')
     ap.add_argument('--fraction', metavar='FLOAT', type=float,
                     default=FRACTION, help='% in how many lists the word must be present in')
+    ap.add_argument('--drop_false_predictions',metavar='INT', type=int,
+                    default=1, help='Whether or not to drop false predictions, 0/1')
     ap.add_argument('--save_n', metavar='INT', type=int,
                     default=SAVE_N, help='How many words/class are saved')
     ap.add_argument('--save_file', default=SAVE_FILE, metavar='FILE',
@@ -56,6 +58,9 @@ def remove_false_predictions(data):
     new_data = data[data.drop_column == True]
     new_data.drop(['drop_column'], axis=1, inplace=True)
     return new_data
+    
+            
+
 
 def choose_n_best(data, n):
     """ choose n best scoring words per document """
@@ -118,10 +123,13 @@ def lin(x):
 
     maxim = max(x)  # x_1 3 -> y_1 1
     minim = min(x)   # x_0 1  -> y_0 0
-    k = 1.0/(maxim-minim)
-    # y-y_0 = k*(x-x_0)
-    # y = k*(x-x0) +y_0 
-    return np.array(k*(x-minim)+0)
+    if maxim == minim:
+        return np.array(0.5*x)
+    else:
+        k = 1.0/(maxim-minim)
+        # y-y_0 = k*(x-x_0)
+        # y = k*(x-x0) +y_0 
+        return np.array(k*(x-minim)+0)
   
 
 
@@ -150,17 +158,21 @@ def rank(df_topscores):
     df_topscores['rank'] = np.array(ranks)
 
 if __name__=="__main__":
+    print("ranked_keywords.py",flush = True)
     options = argparser().parse_args(sys.argv[1:])
+    print(options,flush = True)
     # get all data in a list
     df_list = []
 
     for filename in glob.glob(options.data+"*.tsv"):
-        print(filename)
-        df = read_data(filename, flush = True)
-        df = remove_false_predictions(df)
+        print(filename, flush = True)
+        df = read_data(filename)
+        df.drop(['id'], axis=1, inplace=True)
+        df['score'] = pd.to_numeric(df['score'])
+        if options.drop_false_predictions == 1:
+            df = remove_false_predictions(df)
+            print("False predictions removed",flush = True)
         df = choose_n_best(df, options.choose_best)
-        #get_frequencies(df)    #these later!!!
-        #df = drop_ambiguous_words(df, DROP_AMBIGUOUS)
         rank(df)
         df_list.append(df)
 
@@ -168,7 +180,6 @@ if __name__=="__main__":
     df_full = pd.concat(df_list, ignore_index=True)
     get_frequencies(df_full)
     df_full = drop_ambiguous_words(df_full, options.drop_amb)
-    print("All downloaded and preprocessed", flush = True)
 
 
     # all keywords present in any list
@@ -180,7 +191,7 @@ if __name__=="__main__":
 
     # array for the good keywords
     keywords = []
-
+    print("Looping over keywords",flush = True)
     for word in all_kws:
         # select those words from full dataframe
         df_sub = df_full[df_full.token == word]
@@ -209,6 +220,7 @@ if __name__=="__main__":
     df_comp = pd.DataFrame(data=keywords, columns = ['label','word', 'freq', 'class_freq', 'mean', 'std', 'min', 'max'])      
     df_comp.sort_values(['label', 'mean'], ascending=[True, False], inplace=True)
     df_save = df_comp.groupby('label').head(options.save_n)
-
-    #display(df_save)
+    
+    #print(df_save)
     df_save.to_csv(options.save_file, sep="\t")
+    print("Saved succesfully",flush = True)
