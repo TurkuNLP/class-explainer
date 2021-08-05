@@ -173,8 +173,6 @@ if __name__=="__main__":
             current = time.time()
             # append data to list
             df_list.append(df)
-            if num_files > 2:
-                break
         except:
             print("Error at ", filename, flush=True)
             current = time.time()
