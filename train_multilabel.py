@@ -100,7 +100,7 @@ def resplit(dataset, ratio=0.5, seed=None):
 
     while True:
         # We shuffle the save data in concat
-        dataset['concat'].shuffle()
+        dataset['concat'].shuffle(seed=seed)
         # Three-way confirmation of whether the split is good (all labels in train, all labels in val, values balanced)
         ok = [False]*3
         deviance = 0
