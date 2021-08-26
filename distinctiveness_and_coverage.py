@@ -13,7 +13,7 @@ PATH = ''
 NUMBER_OF_KEYWORDS = 100
 key_values = ['HI', 'ID', 'IN', 'IP','LY', 'NA', 'OP']
 
-# Run this with 
+# Run this with
 #py distinctiveness_and_coverage.py --document_data='*path to folder*' --keyword_data='path and file name up untill the key value' --style='TP' #true positive
 
 def argparser():
@@ -37,7 +37,7 @@ def preprocess_text(d):
         d= " "
     d2 = re.sub(r"\s?([^\w\s'/\-\+$]+)\s?", r" \1 ", d)
     return d2.lower()
-    
+
 
 
 def preprocess_label(d):
@@ -71,7 +71,7 @@ def get_labels(df_list):
         pred_labels = []
         for index, row in sub_df.iterrows():
             pred_labels.append(row['pred_label'])
-        
+
         # get the most common prediction(s) with multimode, and remove everything over 6
         most_frequent_predictions_raw = np.array(multimode(pred_labels))
         most_frequent_predictions = most_frequent_predictions_raw[most_frequent_predictions_raw < 7]
@@ -93,7 +93,7 @@ def get_labels(df_list):
         else:
             # we have no predictions so
             pass
-        
+
     return pd.DataFrame(data = data, columns=['doc_id', 'true_label','pred_label','type','text'])
 
 
@@ -216,7 +216,7 @@ def mark_false_predictions(data):
 def process(data, style):
     """
     Keep, as the 'label', the true positives, all predictions, or true labels
-    Returns the same data but with added column 'label', which is 
+    Returns the same data but with added column 'label', which is
     used in the calculations
     """
 
@@ -248,7 +248,7 @@ def count_occurence(keywords, text, index, mean_text_length):
     count = 0.0
     for word in keywords:
         try:
-            if " "+word+" " in text:   # empty space to remove compound words ect.
+            if " "+word+" " in text:   # empty space to remove compound words ect.# TODO: text = text.split(); word in text? currently doesn't count first and last word
                 count += 1
         except:   # since there will be null values at the end
             pass
@@ -286,7 +286,7 @@ def get_mean_text_length_in_char(data):
 
 
 def coverage(labelled_predictions,keywords, style):
-    
+
     # get the column 'label' that is considered the correct label
     # according to the options.style
     print(labelled_predictions)
@@ -294,12 +294,12 @@ def coverage(labelled_predictions,keywords, style):
 
     print(df)
 
-    
-    # calculate text lengths (in unique words) for normalizing 
+
+    # calculate text lengths (in unique words) for normalizing
     df['text_length_in_char'] = df['text'].apply(lambda x: len(x))
     df['text_length'] = df['text'].apply(lambda x: len(np.unique(x.split(" "))))
     shortest_doc_len = min(df['text_length'])
-    
+
     # mean text length, both options
     mean_text_length = get_mean_text_length(df)
     mean_text_length_in_char = get_mean_text_length_in_char(df)
@@ -321,7 +321,7 @@ def coverage(labelled_predictions,keywords, style):
             text = row['text']
             kw = keywords[label].values
             index = key_values.index(label)
-    
+
             l.append(label)
             s.append(count_occurence(kw, text, index, mean_text_length_in_char))
             t.append(row['text'])
@@ -332,7 +332,7 @@ def coverage(labelled_predictions,keywords, style):
     #save_df['score'] = s
     #save_df['type'] = c
     #save_df.to_csv("coverage_scores2.tsv", sep="\t")
-    
+
 
     # calculate mean per class
     coverage = pd.DataFrame(data=l, columns= ['label'])
@@ -407,6 +407,3 @@ if __name__=="__main__":
     distinctive_mean = distinctiveness(keywords=keywords)
 
     coverage(labelled_docs, keywords, options.style)
-
-
-
