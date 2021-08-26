@@ -13,7 +13,8 @@ PATH = ''
 NUMBER_OF_KEYWORDS = 100
 key_values = ['HI', 'ID', 'IN', 'IP','LY', 'NA', 'OP']
 
-
+# Run this with 
+#py distinctiveness_and_coverage.py --document_data='*path to folder*' --keyword_data='path and file name up untill the key value' --style='TP' #true positive
 
 def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
@@ -241,7 +242,7 @@ def process(data, style):
 def count_occurence(keywords, text, index, mean_text_length):
     """
     Count the occurrence of keywords in text
-    Here a bit unsure of using the length of text is char or in unique words
+    Text lengths are in number of unique words
     """
 
     count = 0.0
@@ -251,7 +252,7 @@ def count_occurence(keywords, text, index, mean_text_length):
                 count += 1
         except:   # since there will be null values at the end
             pass
-    return count*(mean_text_length[index] / len(text))
+    return count*(mean_text_length[index] / len(np.unique(text.split(" "))))
 
 def get_mean_text_length(data):
     """
@@ -296,10 +297,10 @@ def coverage(labelled_predictions,keywords, style):
     
     # calculate text lengths (in unique words) for normalizing 
     df['text_length_in_char'] = df['text'].apply(lambda x: len(x))
-    df['text_length'] = df['text'].apply(lambda x: np.unique(len(x.split(" "))))
+    df['text_length'] = df['text'].apply(lambda x: len(np.unique(x.split(" "))))
     shortest_doc_len = min(df['text_length'])
     
-    # mean text length, voth options
+    # mean text length, both options
     mean_text_length = get_mean_text_length(df)
     mean_text_length_in_char = get_mean_text_length_in_char(df)
 
