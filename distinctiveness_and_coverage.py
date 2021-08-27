@@ -6,11 +6,12 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
 import time
 from collections import Counter
-from statistics import multimode
+#from statistics import multimode
 import csv
 
 PATH = ''
 NUMBER_OF_KEYWORDS = 100
+FREQUENT_PREDICTIONS_THRESHOLD = 0.5
 key_values = ['HI', 'ID', 'IN', 'IP','LY', 'NA', 'OP']
 
 # Run this with
@@ -73,8 +74,12 @@ def get_labels(df_list):
             pred_labels.append(row['pred_label'])
 
         # get the most common prediction(s) with multimode, and remove everything over 6
-        most_frequent_predictions_raw = np.array(multimode(pred_labels))
-        most_frequent_predictions = most_frequent_predictions_raw[most_frequent_predictions_raw < 7]
+        #most_frequent_predictions_raw = np.array(multimode(pred_labels))
+        #most_frequent_predictions = most_frequent_predictions_raw[most_frequent_predictions_raw < 7]
+
+        n_experiments = len(df_list)
+        cntr = Counter([x for x in pred_labels if x < 7])
+        most_frequent_predictions = [cl for cl,cnt in cntr.items() if cnt >= n_experiments*FREQUENT_PREDICTIONS_THRESHOLD]
 
         # if we have (a) suitable prediction(s)
         # see if they are correct or not
