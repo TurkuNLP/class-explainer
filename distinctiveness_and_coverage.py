@@ -423,7 +423,7 @@ if __name__=="__main__":
         try:
             num_files +=1
             print(filename, flush = True)
-            raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'pred_label', 'true_label', 'text'])#.rename(columns={"0":'doc_id', "1":'true_label', "2":'pred_label',"3":'text'})
+            raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'pred_label', 'true_label', 'text'])#.rename(columns={"0":'doc_id', "1":'true_label', "2":'pred_label',"3":'text'}) # NOTE: Why is pred before true label?
             # remove null predictions
             print(raw_data.head())
             raw_data.dropna(axis = 0, how='any', inplace = True)
