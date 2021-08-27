@@ -6,15 +6,15 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
 import time
 from collections import Counter
-from statistics import multimode
+import collections
+#from statistics import multimode
 import csv
 
 PATH = ''
 NUMBER_OF_KEYWORDS = 100
 key_values = ['HI', 'ID', 'IN', 'IP','LY', 'NA', 'OP']
+PREDICTION_THRESHOLD = 0.5
 
-# Run this with
-#py distinctiveness_and_coverage.py --document_data='*path to folder*' --keyword_data='path and file name up untill the key value' --style='TP' #true positive
 
 def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
@@ -26,6 +26,8 @@ def argparser():
                     help='Threshold for number of keywords compared/chosen per register')
     ap.add_argument('--style', metavar='STR', type=str, default='TP',
                     help='TP = True Positive, P = Predictions, TL = True Label')
+    ap.add_argument('--prediction_threshold', type=float, default=PREDICTION_THRESHOLD,
+                    help='Threshold for choosing best predictions from all predcitions')
     return ap
 
 
@@ -37,7 +39,7 @@ def preprocess_text(d):
         d= " "
     d2 = re.sub(r"\s?([^\w\s'/\-\+$]+)\s?", r" \1 ", d)
     return d2.lower()
-
+    
 
 
 def preprocess_label(d):
@@ -46,6 +48,23 @@ def preprocess_label(d):
     new_label2 = [s for s in new_label if s < 7]
     return new_label2
 
+def flatten(t):
+    """
+    Flattens a nested list to a normal list
+    [[2,3], 4] = [2,3,4]
+    """
+    return [item for sublist in t for item in sublist]
+
+def multimode(data):
+    res = []
+    data_list1 = Counter(data) 
+    temp = data_list1.most_common(1)[0][1] 
+    for ele in data:
+        if data.count(ele) == temp:
+            res.append(ele)
+    res = list(set(res))
+
+    return res 
 
 def get_labels(df_list):
     """
@@ -72,9 +91,17 @@ def get_labels(df_list):
         for index, row in sub_df.iterrows():
             pred_labels.append(row['pred_label'])
 
+        pred_labels = flatten(pred_labels)
+        
         # get the most common prediction(s) with multimode, and remove everything over 6
-        most_frequent_predictions_raw = np.array(multimode(pred_labels))
-        most_frequent_predictions = most_frequent_predictions_raw[most_frequent_predictions_raw < 7]
+        #most_frequent_predictions_raw = np.array(multimode(pred_labels))
+        #most_frequent_predictions = most_frequent_predictions_raw[most_frequent_predictions_raw < 7]
+
+        n_experiments = len(df_list)
+        cntr = collections.Counter([x for x in pred_labels if x < 7])
+        most_frequent_predictions = [cl for cl,cnt in cntr.items() if cnt >= n_experiments*options.prediction_threshold]
+
+
 
         # if we have (a) suitable prediction(s)
         # see if they are correct or not
@@ -93,7 +120,7 @@ def get_labels(df_list):
         else:
             # we have no predictions so
             pass
-
+        
     return pd.DataFrame(data = data, columns=['doc_id', 'true_label','pred_label','type','text'])
 
 
@@ -118,6 +145,8 @@ def concatenate(dfs, n = 0):
         return pd.concat(df_list, axis = 1)
     else:
         return pd.concat(dfs, axis=1)
+
+ 
 
 
 
@@ -192,6 +221,9 @@ def distinctiveness(keywords):
     print("std dev: ",np.std(percent_key))
     return np.mean(percent_key)
 
+
+  
+
 ############################### COVERAGE #################################
 
 def mark_false_predictions(data):
@@ -216,14 +248,16 @@ def mark_false_predictions(data):
 def process(data, style):
     """
     Keep, as the 'label', the true positives, all predictions, or true labels
-    Returns the same data but with added column 'label', which is
+    Returns the same data but with added column 'label', which is 
     used in the calculations
     """
 
     if style == "TP":
         # we want to drop all false predictions
         mark_false_predictions(data)
+        print(data['label'].value_counts())
         data.dropna(inplace = True)
+        print(data['label'].value_counts())
         return data
 
     elif style == "P":
@@ -239,7 +273,7 @@ def process(data, style):
         pass
 
 
-def count_occurrence(keywords, text):
+def count_occurence(keywords, text, index, mean_text_length):
     """
     Count the occurrence of keywords in text
     Text lengths are in number of unique words
@@ -248,11 +282,11 @@ def count_occurrence(keywords, text):
     count = 0.0
     for word in keywords:
         try:
-            if word in text.split(): #" "+word+" " in text:   # empty space to remove compound words ect.
+            if " "+word+" " in text:   # empty space to remove compound words ect.
                 count += 1
         except:   # since there will be null values at the end
             pass
-    return count
+    return count*(mean_text_length[index] / len(np.unique(text.split(" "))))
 
 def get_mean_text_length(data):
     """
@@ -262,7 +296,6 @@ def get_mean_text_length(data):
     for index, row in data.iterrows():
         lbl = row['label']
         for l in lbl:
-            print(l)
             results[l].append(row['text_length'])
     means = []
     for i in range(len(results)):
@@ -286,20 +319,18 @@ def get_mean_text_length_in_char(data):
 
 
 def coverage(labelled_predictions,keywords, style):
-
+    
     # get the column 'label' that is considered the correct label
     # according to the options.style
-    print(labelled_predictions)
+    #print(labelled_predictions)
     df = process(labelled_predictions, style)
 
-    print(df)
-
-
-    # calculate text lengths (in unique words) for normalizing
+    
+    # calculate text lengths (in unique words) for normalizing 
     df['text_length_in_char'] = df['text'].apply(lambda x: len(x))
     df['text_length'] = df['text'].apply(lambda x: len(np.unique(x.split(" "))))
     shortest_doc_len = min(df['text_length'])
-
+    
     # mean text length, both options
     mean_text_length = get_mean_text_length(df)
     mean_text_length_in_char = get_mean_text_length_in_char(df)
@@ -321,9 +352,9 @@ def coverage(labelled_predictions,keywords, style):
             text = row['text']
             kw = keywords[label].values
             index = key_values.index(label)
-
+    
             l.append(label)
-            s.append(count_occurrence(kw, text)*(mean_text_length[index] / len(np.unique(text.split()))))
+            s.append(count_occurence(kw, text, index, mean_text_length_in_char))
             t.append(row['text'])
             #c.append(row['type'])
 
@@ -332,7 +363,7 @@ def coverage(labelled_predictions,keywords, style):
     #save_df['score'] = s
     #save_df['type'] = c
     #save_df.to_csv("coverage_scores2.tsv", sep="\t")
-
+    
 
     # calculate mean per class
     coverage = pd.DataFrame(data=l, columns= ['label'])
@@ -344,6 +375,42 @@ def coverage(labelled_predictions,keywords, style):
 
 
 
+def corpus_coverage(keyword, labelled_predictions, style):
+    data = process(labelled_predictions, style)
+    
+    for key in key_values:
+        key_num = key_values.index(key)
+        words = []
+        scores = []
+        for word in keywords[key].dropna():
+            word_count = 0.0
+            doc_count = 0.0
+            for index, row in data.iterrows():
+                label_num = row['label']
+                for lbl_num in label_num:
+                    lbl = key_values[lbl_num]
+                    txt = row['text']
+                    if lbl == key:
+                            doc_count += 1
+                            if word in txt:
+                                word_count += 1
+            #print("word: ", word)
+            #print("in this many docs: ", word_count)
+            #print("all docs with label: ", doc_count)
+            words.append(word)
+            scores.append(word_count/doc_count)
+        #filename = "roskaa/Testttiiiuwu"+key+".csv"
+        #with open(filename, "w") as f:
+        #    for i in range(len(words)):
+        #        line = str(words[i])+ ","+str(scores[i])+"\n"
+        #        f.write(line)
+        #f.close() 
+        print(key, ": ", np.mean(scores), " support: ", doc_count)
+        
+        
+
+
+
 
 
 if __name__=="__main__":
@@ -351,37 +418,34 @@ if __name__=="__main__":
     options = argparser().parse_args(sys.argv[1:])
     data_list = []
     num_files = 0
-    current_time = time.time()
-    print(current_time)
 
 
     for filename in glob.glob(options.document_data+"/*.tsv"):
         try:
             num_files +=1
             print(filename, flush = True)
-            raw_data = pd.read_csv(filename, sep='\t', index_col=0).rename(columns={"0":'doc_id', "1":'true_label', "2":'pred_label',"3":'text'})
+            raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'pred_label', 'true_label', 'text'])#.rename(columns={"0":'doc_id', "1":'true_label', "2":'pred_label',"3":'text'})
             # remove null predictions
+            print(raw_data.head())
             raw_data.dropna(axis = 0, how='any', inplace = True)
             # add white space to punctuation and lowercase the letters
             raw_data['text'] = raw_data['text'].apply(preprocess_text)
             # add commas to multilabels and change them  to numeric data
             raw_data['true_label'] = raw_data['true_label'].apply(preprocess_label)
-            raw_data['pred_label'] = raw_data['pred_label'].astype(int)
+            raw_data['pred_label'] = raw_data['pred_label'].apply(preprocess_label)
             # add a tag for the source file
             raw_data['source'] = filename
             data_list.append(raw_data)
-            print(time.time()-current_time)
-            current_time = time.time()
         except:
             print("Error at ", filename, flush=True)
 
 
     # get the most common prediction for all documents
-    # prediction must be 0...7
-    # if there are labels between 0 and 7 that are equally good
+    # prediction must be 0...6
+    # if there are labels between 0 and 6 that are equally good
     # keep them both
     labelled_docs = get_labels(data_list)
-    print(labelled_docs)
+    #print(labelled_docs.head(30))
 
 
     # read the keywords per class
@@ -402,8 +466,14 @@ if __name__=="__main__":
 
 
 
+
     # THE CALCULATIONS
 
     distinctive_mean = distinctiveness(keywords=keywords)
 
     coverage(labelled_docs, keywords, options.style)
+
+    corpus_coverage(keywords, labelled_docs, options.style)
+
+
+
