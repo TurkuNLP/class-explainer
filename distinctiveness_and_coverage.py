@@ -14,8 +14,6 @@ NUMBER_OF_KEYWORDS = 100
 key_values = ['HI', 'ID', 'IN', 'IP','LY', 'NA', 'OP']
 PREDICTION_THRESHOLD = 0.5
 
-# Run this with
-#py distinctiveness_and_coverage.py --document_data='*path to folder*' --keyword_data='path and file name up untill the key value' --style='TP' #true positive
 
 def argparser():
     ap = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
@@ -40,7 +38,7 @@ def preprocess_text(d):
         d= " "
     d2 = re.sub(r"\s?([^\w\s'/\-\+$]+)\s?", r" \1 ", d)
     return d2.lower()
-
+    
 
 
 def preprocess_label(d):
@@ -121,7 +119,7 @@ def get_labels(df_list):
         else:
             # we have no predictions so
             pass
-
+        
     return pd.DataFrame(data = data, columns=['doc_id', 'true_label','pred_label','type','text'])
 
 
@@ -146,6 +144,8 @@ def concatenate(dfs, n = 0):
         return pd.concat(df_list, axis = 1)
     else:
         return pd.concat(dfs, axis=1)
+
+ 
 
 
 
@@ -220,6 +220,9 @@ def distinctiveness(keywords):
     print("std dev: ",np.std(percent_key))
     return np.mean(percent_key)
 
+
+  
+
 ############################### COVERAGE #################################
 
 def mark_false_predictions(data):
@@ -244,7 +247,7 @@ def mark_false_predictions(data):
 def process(data, style):
     """
     Keep, as the 'label', the true positives, all predictions, or true labels
-    Returns the same data but with added column 'label', which is
+    Returns the same data but with added column 'label', which is 
     used in the calculations
     """
 
@@ -292,7 +295,6 @@ def get_mean_text_length(data):
     for index, row in data.iterrows():
         lbl = row['label']
         for l in lbl:
-            print(l)
             results[l].append(row['text_length'])
     means = []
     for i in range(len(results)):
@@ -316,7 +318,7 @@ def get_mean_text_length_in_char(data):
 
 
 def coverage(labelled_predictions,keywords, style):
-
+    
     # get the column 'label' that is considered the correct label
     # according to the options.style
     #print(labelled_predictions)
@@ -327,7 +329,7 @@ def coverage(labelled_predictions,keywords, style):
     df['text_length_in_char'] = df['text'].apply(lambda x: len(x))
     df['text_length'] = df['text'].apply(lambda x: len(np.unique(x.split(" "))))
     shortest_doc_len = min(df['text_length'])
-
+    
     # mean text length, both options
     mean_text_length = get_mean_text_length(df)
     mean_text_length_in_char = get_mean_text_length_in_char(df)
@@ -349,7 +351,7 @@ def coverage(labelled_predictions,keywords, style):
             text = row['text']
             kw = keywords[label].values
             index = key_values.index(label)
-
+    
             l.append(label)
             s.append(count_occurrence(kw, text)*(mean_text_length[index] / len(np.unique(text.split()))))
             t.append(row['text'])
@@ -360,7 +362,7 @@ def coverage(labelled_predictions,keywords, style):
     #save_df['score'] = s
     #save_df['type'] = c
     #save_df.to_csv("coverage_scores2.tsv", sep="\t")
-
+    
 
     # calculate mean per class
     coverage = pd.DataFrame(data=l, columns= ['label'])
@@ -415,8 +417,6 @@ if __name__=="__main__":
     options = argparser().parse_args(sys.argv[1:])
     data_list = []
     num_files = 0
-    current_time = time.time()
-    print(current_time)
 
 
     for filename in glob.glob(options.document_data+"/*.tsv"):
@@ -435,8 +435,6 @@ if __name__=="__main__":
             # add a tag for the source file
             raw_data['source'] = filename
             data_list.append(raw_data)
-            print(time.time()-current_time)
-            current_time = time.time()
         except:
             print("Error at ", filename, flush=True)
 
@@ -463,6 +461,7 @@ if __name__=="__main__":
 
     # NOW all is preprocessed
     print("Preprocessing done", flush=True)
+
 
 
 
