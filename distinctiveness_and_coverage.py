@@ -239,7 +239,7 @@ def process(data, style):
         pass
 
 
-def count_occurence(keywords, text, index, mean_text_length):
+def count_occurrence(keywords, text):
     """
     Count the occurrence of keywords in text
     Text lengths are in number of unique words
@@ -248,11 +248,11 @@ def count_occurence(keywords, text, index, mean_text_length):
     count = 0.0
     for word in keywords:
         try:
-            if " "+word+" " in text:   # empty space to remove compound words ect.# TODO: text = text.split(); word in text? currently doesn't count first and last word
+            if word in text.split(): #" "+word+" " in text:   # empty space to remove compound words ect.
                 count += 1
         except:   # since there will be null values at the end
             pass
-    return count*(mean_text_length[index] / len(np.unique(text.split(" "))))
+    return count
 
 def get_mean_text_length(data):
     """
@@ -323,7 +323,7 @@ def coverage(labelled_predictions,keywords, style):
             index = key_values.index(label)
 
             l.append(label)
-            s.append(count_occurence(kw, text, index, mean_text_length_in_char))
+            s.append(count_occurrence(kw, text)*(mean_text_length[index] / len(np.unique(text.split()))))
             t.append(row['text'])
             #c.append(row['type'])
 
