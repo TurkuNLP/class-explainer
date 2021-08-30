@@ -6,6 +6,7 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
 import time
 from collections import Counter
+import collections
 #from statistics import multimode
 import csv
 
@@ -97,7 +98,7 @@ def get_labels(df_list):
         #most_frequent_predictions = most_frequent_predictions_raw[most_frequent_predictions_raw < 7]
 
         n_experiments = len(df_list)
-        cntr = Counter([x for x in pred_labels if x < 7])
+        cntr = collections.Counter([x for x in pred_labels if x < 7])
         most_frequent_predictions = [cl for cl,cnt in cntr.items() if cnt >= n_experiments*options.prediction_threshold]
 
 
@@ -202,7 +203,7 @@ def get_0_percentage(values):
 
 def distinctiveness(keywords):
     df = keywords
-    percent = []
+    percent_mean = []
     percent_std = []
     percent_key = []
 
@@ -213,12 +214,12 @@ def distinctiveness(keywords):
     # loop over them and print out info
     for i in range(len(value_matrix)):
         percent_key.append(get_0_percentage(value_matrix[i])[0])
-        print(key_values[i], ": ", get_0_percentage(value_matrix[i])[0], "% , ", get_0_percentage(value_matrix[i])[1], "/", get_0_percentage(value_matrix[i])[2] )
-    percent.append(np.mean(percent_key))
+        print(key_values[i], ": ", get_0_percentage(value_matrix[i])[0], " , ", get_0_percentage(value_matrix[i])[1], "/", get_0_percentage(value_matrix[i])[2] )
+    percent_mean.append(np.mean(percent_key))
     print("mean: ",np.mean(percent_key))
     percent_std.append(np.std(percent_key))
     print("std dev: ",np.std(percent_key))
-    return np.mean(percent_key)
+    return percent_key, percent_mean, percent_std 
 
 
   
@@ -254,9 +255,7 @@ def process(data, style):
     if style == "TP":
         # we want to drop all false predictions
         mark_false_predictions(data)
-        print(data['label'].value_counts())
         data.dropna(inplace = True)
-        print(data['label'].value_counts())
         return data
 
     elif style == "P":
@@ -272,7 +271,7 @@ def process(data, style):
         pass
 
 
-def count_occurrence(keywords, text):
+def count_occurence(keywords, text, index, mean_text_length):
     """
     Count the occurrence of keywords in text
     Text lengths are in number of unique words
@@ -281,11 +280,11 @@ def count_occurrence(keywords, text):
     count = 0.0
     for word in keywords:
         try:
-            if word in text.split(): #" "+word+" " in text:   # empty space to remove compound words ect.
+            if " "+word+" " in text:   # empty space to remove compound words ect.
                 count += 1
         except:   # since there will be null values at the end
             pass
-    return count
+    return count*(mean_text_length[index] / len(np.unique(text.split(" "))))
 
 def get_mean_text_length(data):
     """
@@ -353,7 +352,7 @@ def coverage(labelled_predictions,keywords, style):
             index = key_values.index(label)
     
             l.append(label)
-            s.append(count_occurrence(kw, text)*(mean_text_length[index] / len(np.unique(text.split()))))
+            s.append(count_occurence(kw, text, index, mean_text_length_in_char))
             t.append(row['text'])
             #c.append(row['type'])
 
@@ -368,10 +367,9 @@ def coverage(labelled_predictions,keywords, style):
     coverage = pd.DataFrame(data=l, columns= ['label'])
     # divide score with theoretical max for normalisation
     coverage['score'] = np.array(s)/theoretical_max_score
-    print(coverage['label'].value_counts())
     means = coverage.groupby('label').mean()
     print(means)
-
+    return means.values
 
 
 def corpus_coverage(keyword, labelled_predictions, style):
@@ -417,15 +415,16 @@ if __name__=="__main__":
     options = argparser().parse_args(sys.argv[1:])
     data_list = []
     num_files = 0
+    #current_time = time.time()
+    #print(current_time)
 
 
-    for filename in glob.glob(options.document_data+"/*.tsv"):
+    for filename in glob.glob(options.document_data+"/*w.tsv"):
         try:
             num_files +=1
             print(filename, flush = True)
-            raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'pred_label', 'true_label', 'text'])#.rename(columns={"0":'doc_id', "1":'true_label', "2":'pred_label',"3":'text'}) # NOTE: Why is pred before true label?
+            raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'pred_label', 'true_label', 'text'])#.rename(columns={"0":'doc_id', "1":'true_label', "2":'pred_label',"3":'text'})
             # remove null predictions
-            print(raw_data.head())
             raw_data.dropna(axis = 0, how='any', inplace = True)
             # add white space to punctuation and lowercase the letters
             raw_data['text'] = raw_data['text'].apply(preprocess_text)
@@ -435,6 +434,10 @@ if __name__=="__main__":
             # add a tag for the source file
             raw_data['source'] = filename
             data_list.append(raw_data)
+            #print(time.time()-current_time)
+            #current_time = time.time()
+            #if num_files > 5:
+                #break
         except:
             print("Error at ", filename, flush=True)
 
@@ -448,31 +451,53 @@ if __name__=="__main__":
 
 
     # read the keywords per class
-    df_HI = pd.read_csv(options.keyword_data+'.tsvHI.tsv', sep='\t')[['token']].rename(columns={"token": "HI"})
-    df_IN = pd.read_csv(options.keyword_data+'.tsvIN.tsv', sep='\t')[['token']].rename(columns={"token": "IN"})
-    df_ID = pd.read_csv(options.keyword_data+'.tsvID.tsv', sep='\t')[['token']].rename(columns={"token": "ID"})
-    df_IP = pd.read_csv(options.keyword_data+'.tsvIP.tsv', sep='\t')[['token']].rename(columns={"token": "IP"})
-    df_LY = pd.read_csv(options.keyword_data+'.tsvLY.tsv', sep='\t')[['token']].rename(columns={"token": "LY"})
-    df_NA = pd.read_csv(options.keyword_data+'.tsvNA.tsv', sep='\t')[['token']].rename(columns={"token": "NA"})
-    df_OP = pd.read_csv(options.keyword_data+'.tsvOP.tsv', sep='\t')[['token']].rename(columns={"token": "OP"})
+    df_HI = pd.read_csv(options.keyword_data+'/HI.tsv', sep='\t')[['token']].rename(columns={"token": "HI"})
+    df_IN = pd.read_csv(options.keyword_data+'/IN.tsv', sep='\t')[['token']].rename(columns={"token": "IN"})
+    df_ID = pd.read_csv(options.keyword_data+'/ID.tsv', sep='\t')[['token']].rename(columns={"token": "ID"})
+    df_IP = pd.read_csv(options.keyword_data+'/IP.tsv', sep='\t')[['token']].rename(columns={"token": "IP"})
+    df_LY = pd.read_csv(options.keyword_data+'/LY.tsv', sep='\t')[['token']].rename(columns={"token": "LY"})
+    df_NA = pd.read_csv(options.keyword_data+'/NA.tsv', sep='\t')[['token']].rename(columns={"token": "NA"})
+    df_OP = pd.read_csv(options.keyword_data+'/OP.tsv', sep='\t')[['token']].rename(columns={"token": "OP"})
 
     kw_list = [df_HI, df_ID, df_IN, df_IP, df_LY, df_NA, df_OP]
     keywords = concatenate(kw_list, options.number_of_keywords)
 
     # NOW all is preprocessed
     print("Preprocessing done", flush=True)
-
+  
 
 
 
 
     # THE CALCULATIONS
 
-    distinctive_mean = distinctiveness(keywords=keywords)
-
-    coverage(labelled_docs, keywords, options.style)
-
+    print("Distictiveness of keywords: ", flush=True)
+    dist_data_per_label, dist_mean, dist_std = distinctiveness(keywords=keywords)
+    print("Coverage: ", flush=True)
+    coverages = coverage(labelled_docs, keywords, options.style)
+    print("Corpus coverage: ", flush=True)
     corpus_coverage(keywords, labelled_docs, options.style)
+
+    # change to float
+    save_data = np.array([dist_data_per_label,flatten(coverages)]).astype('float')
+    
+    # make new dataframe
+    df_save = pd.DataFrame(data = key_values, columns=['label'])
+    df_save['distinctiveness'] = save_data[0]
+    df_save['coverage'] = save_data[1]
+    df_save['delta'] = df_save['distinctiveness'].values.astype('float')- df_save['coverage'].values.astype('float')
+    
+    
+    # add the mean of each column
+    mean_of_values = df_save.mean(axis = 0).values
+    mean_row = flatten(['-', mean_of_values])
+    new_row= {'label':'-', 'distinctiveness':mean_row[1], 'coverage':mean_row[2], 'delta':mean_row[3]}
+    df_save_new = df_save.append(new_row, ignore_index=True)
+
+    # display
+    print(df_save_new, flush=True)    
+
+    # saving? just df_save.to_csv(filename, sep='\t')
 
 
 
