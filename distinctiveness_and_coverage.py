@@ -280,11 +280,13 @@ def count_occurrence(keywords, text):
     count = 0.0
     for word in keywords:
         try:
-            if word in text.split():   # white space removed
+            if word in text.split(" "):   # empty space to remove compound words ect.
                 count += 1
         except:   # since there will be null values at the end
             pass
     return count
+
+
 
 def get_mean_text_length(data):
     """
@@ -320,13 +322,13 @@ def coverage(labelled_predictions,keywords, style):
     
     # get the column 'label' that is considered the correct label
     # according to the options.style
-    #print(labelled_predictions)
+
     df = process(labelled_predictions, style)
 
     
     # calculate text lengths (in unique words) for normalizing 
-    df['text_length_in_char'] = df['text'].apply(lambda x: len(x))
     df['text_length'] = df['text'].apply(lambda x: len(np.unique(x.split(" "))))
+    df['text_length_in_char'] = df['text'].apply(lambda x: len(x))
     shortest_doc_len = min(df['text_length'])
     
     # mean text length, both options
@@ -341,40 +343,33 @@ def coverage(labelled_predictions,keywords, style):
     l = []
     s = []
     t = []
-    #c = []
     for i, row in df.iterrows():
         label_num = row['label']
         # loop over all labels
         for lb in label_num:
             label = key_values[lb]
             text = row['text']
+            len_text = len(np.unique(text.split(" ")))
             kw = keywords[label].values
             index = key_values.index(label)
     
             l.append(label)
-            s.append(count_occurrence(kw, text)*(mean_text_length[index] / len(np.unique(text.split()))))
-            t.append(row['text'])
-            #c.append(row['type'])
-
-    # if you want to save, uncomment these
-    #save_df = pd.DataFrame(data = l, columns=['label'])
-    #save_df['score'] = s
-    #save_df['type'] = c
-    #save_df.to_csv("coverage_scores2.tsv", sep="\t")
-    
+            s.append(count_occurrence(kw, text)*(mean_text_length[index] / len_text))
+            t.append(row['text'])    
 
     # calculate mean per class
     coverage = pd.DataFrame(data=l, columns= ['label'])
     # divide score with theoretical max for normalisation
     coverage['score'] = np.array(s)/theoretical_max_score
     means = coverage.groupby('label').mean()
-    print(means)
+    #print(means)
     return means.values
 
 
 def corpus_coverage(keywords, labelled_predictions, style):
     data = process(labelled_predictions, style)
     
+    data_collection_scores = []
     for key in key_values:
         key_num = key_values.index(key)
         words = []
@@ -403,6 +398,9 @@ def corpus_coverage(keywords, labelled_predictions, style):
         #        f.write(line)
         #f.close() 
         print(key, ": ", np.mean(scores), " support: ", doc_count)
+        data_collection_scores.append(np.mean(scores))
+    
+    return data_collection_scores
         
         
 
@@ -415,8 +413,6 @@ def calculate(options):
     
     data_list = []
     num_files = 0
-    #current_time = time.time()
-    #print(current_time)
 
 
     for filename in glob.glob(options.document_data+"/*w.tsv"):
@@ -434,10 +430,6 @@ def calculate(options):
             # add a tag for the source file
             raw_data['source'] = filename
             data_list.append(raw_data)
-            #print(time.time()-current_time)
-            #current_time = time.time()
-            #if num_files > 5:
-                #break
         except:
             print("Error at ", filename, flush=True)
 
@@ -451,13 +443,13 @@ def calculate(options):
 
 
     # read the keywords per class
-    df_HI = pd.read_csv(options.keyword_data+'/HI.tsv', sep='\t')[['token']].rename(columns={"token": "HI"})
-    df_IN = pd.read_csv(options.keyword_data+'/IN.tsv', sep='\t')[['token']].rename(columns={"token": "IN"})
-    df_ID = pd.read_csv(options.keyword_data+'/ID.tsv', sep='\t')[['token']].rename(columns={"token": "ID"})
-    df_IP = pd.read_csv(options.keyword_data+'/IP.tsv', sep='\t')[['token']].rename(columns={"token": "IP"})
-    df_LY = pd.read_csv(options.keyword_data+'/LY.tsv', sep='\t')[['token']].rename(columns={"token": "LY"})
-    df_NA = pd.read_csv(options.keyword_data+'/NA.tsv', sep='\t')[['token']].rename(columns={"token": "NA"})
-    df_OP = pd.read_csv(options.keyword_data+'/OP.tsv', sep='\t')[['token']].rename(columns={"token": "OP"})
+    df_HI = pd.read_csv(options.keyword_data+'HI.tsv', sep='\t')[['token']].rename(columns={"token": "HI"})
+    df_IN = pd.read_csv(options.keyword_data+'IN.tsv', sep='\t')[['token']].rename(columns={"token": "IN"})
+    df_ID = pd.read_csv(options.keyword_data+'ID.tsv', sep='\t')[['token']].rename(columns={"token": "ID"})
+    df_IP = pd.read_csv(options.keyword_data+'IP.tsv', sep='\t')[['token']].rename(columns={"token": "IP"})
+    df_LY = pd.read_csv(options.keyword_data+'LY.tsv', sep='\t')[['token']].rename(columns={"token": "LY"})
+    df_NA = pd.read_csv(options.keyword_data+'NA.tsv', sep='\t')[['token']].rename(columns={"token": "NA"})
+    df_OP = pd.read_csv(options.keyword_data+'OP.tsv', sep='\t')[['token']].rename(columns={"token": "OP"})
 
     kw_list = [df_HI, df_ID, df_IN, df_IP, df_LY, df_NA, df_OP]
     keywords = concatenate(kw_list, options.number_of_keywords)
@@ -476,23 +468,28 @@ def calculate(options):
     print("Coverage: ", flush=True)
     coverages = coverage(labelled_docs, keywords, options.style)
     print("Corpus coverage: ", flush=True)
-    corpus_coverage(keywords, labelled_docs, options.style)
+    corpus_scores = corpus_coverage(keywords, labelled_docs, options.style)
 
     # change to float
-    save_data = np.array([dist_data_per_label,flatten(coverages)]).astype('float')
+    save_data = np.array([dist_data_per_label,flatten(coverages), corpus_scores]).astype('float')
     
     # make new dataframe
     df_save = pd.DataFrame(data = key_values, columns=['label'])
     df_save['distinctiveness'] = save_data[0]
     df_save['coverage'] = save_data[1]
+    df_save['corpus_coverage'] = save_data[2]
     df_save['delta'] = df_save['distinctiveness'].values.astype('float')- df_save['coverage'].values.astype('float')
     
     
     # add the mean of each column
     mean_of_values = df_save.mean(axis = 0).values
+    std_of_values = df_save.std(axis=0).values
     mean_row = flatten(['-', mean_of_values])
-    new_row= {'label':'-', 'distinctiveness':mean_row[1], 'coverage':mean_row[2], 'delta':mean_row[3]}
-    df_save_new = df_save.append(new_row, ignore_index=True)
+    std_row = flatten(['-', std_of_values])
+    new_row= {'label':'Mean', 'distinctiveness':mean_row[1], 'coverage':mean_row[2], 'corpus_coverage':mean_row[3], 'delta': mean_row[4]}
+    new_row2 = {'label':'Std', 'distinctiveness':std_row[1], 'coverage':std_row[2], 'corpus_coverage':std_row[3], 'delta': std_row[4]}
+    df_save_0 = df_save.append(new_row, ignore_index=True)
+    df_save_new = df_save_0.append(new_row2, ignore_index=True)
 
     # display
     print(df_save_new, flush=True)    
