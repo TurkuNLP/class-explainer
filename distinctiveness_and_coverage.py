@@ -271,7 +271,7 @@ def process(data, style):
         pass
 
 
-def count_occurence(keywords, text, index, mean_text_length):
+def count_occurrence(keywords, text):
     """
     Count the occurrence of keywords in text
     Text lengths are in number of unique words
@@ -280,11 +280,11 @@ def count_occurence(keywords, text, index, mean_text_length):
     count = 0.0
     for word in keywords:
         try:
-            if " "+word+" " in text:   # empty space to remove compound words ect.
+            if word in text.split():   # white space removed
                 count += 1
         except:   # since there will be null values at the end
             pass
-    return count*(mean_text_length[index] / len(np.unique(text.split(" "))))
+    return count
 
 def get_mean_text_length(data):
     """
@@ -342,7 +342,7 @@ def coverage(labelled_predictions,keywords, style):
     s = []
     t = []
     #c = []
-    for index, row in df.iterrows():
+    for i, row in df.iterrows():
         label_num = row['label']
         # loop over all labels
         for lb in label_num:
@@ -352,7 +352,7 @@ def coverage(labelled_predictions,keywords, style):
             index = key_values.index(label)
     
             l.append(label)
-            s.append(count_occurence(kw, text, index, mean_text_length_in_char))
+            s.append(count_occurrence(kw, text)*(mean_text_length[index] / len(np.unique(text.split()))))
             t.append(row['text'])
             #c.append(row['type'])
 
@@ -372,7 +372,7 @@ def coverage(labelled_predictions,keywords, style):
     return means.values
 
 
-def corpus_coverage(keyword, labelled_predictions, style):
+def corpus_coverage(keywords, labelled_predictions, style):
     data = process(labelled_predictions, style)
     
     for key in key_values:
@@ -410,9 +410,9 @@ def corpus_coverage(keyword, labelled_predictions, style):
 
 
 
-if __name__=="__main__":
+def calculate(options):
 
-    options = argparser().parse_args(sys.argv[1:])
+    
     data_list = []
     num_files = 0
     #current_time = time.time()
@@ -423,7 +423,7 @@ if __name__=="__main__":
         try:
             num_files +=1
             print(filename, flush = True)
-            raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'pred_label', 'true_label', 'text'])#.rename(columns={"0":'doc_id', "1":'true_label', "2":'pred_label',"3":'text'})
+            raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'true_label', 'pred_label', 'text'])
             # remove null predictions
             raw_data.dropna(axis = 0, how='any', inplace = True)
             # add white space to punctuation and lowercase the letters
@@ -500,4 +500,6 @@ if __name__=="__main__":
     # saving? just df_save.to_csv(filename, sep='\t')
 
 
-
+if __name__=="__main__":
+    options = argparser().parse_args(sys.argv[1:])
+    calculate(options)
