@@ -224,7 +224,7 @@ def process_data(options):
     df_sep['score_std'] = new_df_save['score_std'].to_numpy()
     df_sep['source_number'] = new_df_save['source_number'].to_numpy()
 
-    print(df_sep)
+    #print(df_sep)
     for key in range(0,7):
         df_plot = df_sep[df_sep.pred_label == key]
         x = range(len(df_plot))
