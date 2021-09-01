@@ -3,10 +3,12 @@ import glob
 import time
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
+from numpy.core.defchararray import title
 from numpy.core.numeric import NaN
 import pandas as pd
 import warnings
 import json
+import matplotlib.pyplot as plt
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -19,7 +21,7 @@ DROP_AMBIGUOUS = 3
 FRACTION = 0.6
 STD_THRESHOLD = 0.2
 THRESHOLD = 3
-SAVE_N = 50
+SAVE_N = 1000
 QUANTILE = 0.25
 SAVE_FILE = "testi2_stable_keywords.tsv"
 UNSTABLE_FILE = "testi2_unstable_keywords.tsv"
@@ -45,6 +47,8 @@ def argparser():
                     help='dir+file for saving the results')
     ap.add_argument('--unstable_file', default=UNSTABLE_FILE, metavar='FILE',
                     help='dir+file for saving the unstable results')
+    ap.add_argument('--plot_file', metavar='FILE', required=True,
+                    help='File for saving plots')
     return ap
 
 def process(data):
@@ -99,7 +103,7 @@ def flatten(t):
     return [item for sublist in t for item in sublist]
 
 
-def filter_class_df(data, key, number):
+def filter_class_df(data, key, number, options):
     """
     Take out everything that has a low document frequency wrt current label (key, number).
     This also removes all tokenization errors, since their document frequency
@@ -140,22 +144,13 @@ def filter_class_df(data, key, number):
 
     data_save.to_csv(filename, sep="\t")  
     data_errors.to_csv(filename_err, sep="\t")  
+    
+
+    
 
 
 
-
-if __name__=="__main__":
-    #print("kws.py",flush = True)
-    options = argparser().parse_args(sys.argv[1:])
-    print(options,flush = True)
-
-    # to see progression speed
-    start = time.time()
-    current = time.time()
-
-    # data collection:
-    # num_files keeps count on the number of files that
-    # are succesfully opened
+def process_data(options):
     df_list = []
     num_files = 0
 
@@ -177,7 +172,6 @@ if __name__=="__main__":
             print("Error at ", filename, flush=True)
             current = time.time()
         
-    print("Preprocessing time: ", time.time()-start, flush=True)
     
     
     # concatenate all for further analysis
@@ -218,7 +212,10 @@ if __name__=="__main__":
     new_df_save.drop(['score','source'], axis=1, inplace=True)
     df_unstable.drop(['score','source'], axis=1, inplace=True)
 
-    # removing pandas hierarchy for extractiong labels
+
+    
+
+    # removing pandas hierarchy for extracting labels
     # groupby() makes the (token, pred_label) pair be an index of the column, so it cant be easily referenced
     # take the index values (token, pred_label) and make them into a new frame
     df_sep = pd.DataFrame(data= new_df_save.index.values.tolist(), columns = ['token', 'pred_label'])
@@ -226,6 +223,16 @@ if __name__=="__main__":
     df_sep['score_mean'] = new_df_save['score_mean'].to_numpy()
     df_sep['score_std'] = new_df_save['score_std'].to_numpy()
     df_sep['source_number'] = new_df_save['source_number'].to_numpy()
+
+    print(df_sep)
+    for key in range(0,7):
+        df_plot = df_sep[df_sep.pred_label == key]
+        x = range(len(df_plot))
+        y = df_plot['source_number']
+        plt.plot(x,y)
+        filename = options.file_name+str(key)
+        plt.savefig(filename)
+
 
     # same for the other frame
     df_sep_unstable = pd.DataFrame(data= df_unstable.index.values.tolist(), columns = ['token', 'pred_label'])
@@ -239,15 +246,23 @@ if __name__=="__main__":
 
     # save results for all the labels separately
     print("Saving individuals with rare words removed", flush=True)
-    filter_class_df(df_sep,"HI", 0)
-    filter_class_df(df_sep,"ID", 1)
-    filter_class_df(df_sep,"IN", 2)
-    filter_class_df(df_sep,"IP", 3)
-    filter_class_df(df_sep,"LY", 4)
-    filter_class_df(df_sep,"NA", 5)
-    filter_class_df(df_sep,"OP", 6)
-    filter_class_df(df_sep,"SP", 7)
+    filter_class_df(df_sep,"HI", 0, options)
+    filter_class_df(df_sep,"ID", 1, options)
+    filter_class_df(df_sep,"IN", 2, options)
+    filter_class_df(df_sep,"IP", 3, options)
+    filter_class_df(df_sep,"LY", 4, options)
+    filter_class_df(df_sep,"NA", 5, options)
+    filter_class_df(df_sep,"OP", 6, options)
+    filter_class_df(df_sep,"SP", 7, options)
 
     print("Everything done", flush=True)
-    print(time.time()-start, flush=True)
 
+
+if __name__=="__main__":
+    #print("kws.py",flush = True)
+    options = argparser().parse_args(sys.argv[1:])
+    print(options,flush = True)
+    process_data(options)
+
+
+    
