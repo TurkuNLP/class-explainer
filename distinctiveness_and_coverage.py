@@ -66,7 +66,7 @@ def multimode(data):
 
     return res 
 
-def get_labels(df_list):
+def get_labels(df_list, options):
     """
     Calculates the best predicted label(s) for each doc.
     Also checks, if the prediction(s) is correct.
@@ -415,7 +415,7 @@ def calculate(options):
     num_files = 0
 
 
-    for filename in glob.glob(options.document_data+"/*w.tsv"):
+    for filename in glob.glob(options.document_data+"*w.tsv"):
         try:
             num_files +=1
             print(filename, flush = True)
@@ -438,7 +438,7 @@ def calculate(options):
     # prediction must be 0...6
     # if there are labels between 0 and 6 that are equally good
     # keep them both
-    labelled_docs = get_labels(data_list)
+    labelled_docs = get_labels(data_list, options)
     #print(labelled_docs.head(30))
 
 
