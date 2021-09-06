@@ -393,7 +393,7 @@ def corpus_coverage(keywords, labelled_predictions, style):
             if doc_count > 0:
                 scores.append(word_count/doc_count)
             else:
-                scores.append(np.nan)
+                scores.append(0.0)
         #filename = "roskaa/Testttiiiuwu"+key+".csv"
         #with open(filename, "w") as f:
         #    for i in range(len(words)):
