@@ -1,4 +1,4 @@
-import dist_and_cov_works
+import distinctiveness_and_coverage as dist_and_cov_works
 import kws
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys

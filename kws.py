@@ -230,7 +230,7 @@ def process_data(options):
         x = range(len(df_plot))
         y = df_plot['source_number']
         plt.plot(x,y)
-        filename = options.file_name+str(key)
+        filename = options.plot_file+str(key)
         plt.savefig(filename)
 
 
