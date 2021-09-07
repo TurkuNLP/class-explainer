@@ -362,7 +362,7 @@ def coverage(labelled_predictions,keywords, style):
     # divide score with theoretical max for normalisation
     coverage['score'] = np.array(s)/theoretical_max_score
     means = coverage.groupby('label').mean()
-    #print(means)
+    print(means)
     return means.values
 
 
@@ -497,7 +497,9 @@ def calculate(options):
     # display
     print(df_save_new, flush=True)    
 
-    # saving? just df_save.to_csv(filename, sep='\t')
+    #saving? just df_save.to_csv(filename, sep='\t')
+    filename = options.results+".tsv"
+    df_save_new.to_csv(filename, sep='\t')
 
 
 if __name__=="__main__":
