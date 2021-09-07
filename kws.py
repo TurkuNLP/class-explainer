@@ -232,6 +232,7 @@ def process_data(options):
         plt.plot(x,y)
         filename = options.plot_file+str(key)
         plt.savefig(filename)
+        plt.close()
 
 
     # same for the other frame
