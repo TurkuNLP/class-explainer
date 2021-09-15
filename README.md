@@ -14,12 +14,14 @@ For more information on the dataset and our motivation, please check: (link to w
     - reads the data (train and dev sets), preprocesses it and makes a new split into random training and validation sets. 
     - trains the model on train data
     - predicts and calculates an attributions score with Integrated Gradients method
-run_resplits.py was run 100 times in our project
+    - depending on the dataset size, running might take 10-20h
+run_resplits.py was run 100 times in our project. 
 
 - run_evaluation.py, that runs kws.py and distinctiveness_and_coverage.py
     - reads the files produced by run_resplits.py
     - extracts keywords by looking at the attribution scores and their presence accross different runs
     - evaluates the resulting keywords using three different metrics
+    - running takes about 1-3h
 
 
 ## Parameters
