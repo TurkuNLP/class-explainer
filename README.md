@@ -27,8 +27,8 @@ run_resplits.py was run 100 times in our project
 run_resplits.py requires following parameters:
 - *model_name*: name of the pretrained model. We used 'xlm-roberta-base' and the IG-aggregation score calculation is made around for XLM-RoBERTa's tokenization.
 - *data*: path to unpreprosessed multilabel data.
-- *batch_size*, *learning_rate*, *epochs*, *patience*: Parameters for training. We used batch_size = , learning_rate = , epochs = , and low patience.
-- *split*, *seed*: ratio and random seed for splitting the training and validation sets. 
+- *batch_size*, *learning_rate*, *epochs*, *patience*: Parameters for training. We used batch_size = 30 , learning_rate = 7.5e-5 , epochs = 12 , and patience = 1.
+- *split*, *seed*: ratio and random seed for splitting the training and validation sets. For split we had 0.67.
 - *checkpoints*: directory for model checkpoint. We're saving *patience*+1 checkpoints.
 - *save_model*: file for saving the model
 - *save_explanations*: file for saving the results
@@ -65,3 +65,37 @@ run_evaluation.py requires following parameters:
 - *document_data*: Path to the document data, same as *data*. 
 - *number_of_keywords*: the amount of best keywords chosen for analysis. We focused on top 100.
 - *style*: ’TP’ = True Positive, ’TL’= True Label or ’P’ = Predictions. Tells us which labels to look at the coverage and corpus coverage phase. We used ’TP’ as the keywords have been extracted from true positives. ’TL’ and 'P' have been implemented out of curiosity.
+
+
+## Example calls
+
+```
+srun python run_resplits.py \
+  --data ./simplified-data/en \
+  --model_name xlm-roberta-base \
+  --lr 7.5e-5 \
+  --epochs 12 \
+  --batch_size 30 \
+  --split 0.67 \
+  --seed $2 \
+  --patience 1 \
+  --save_explanations explanations/$1 \
+  --save_model models/$1 
+```
+
+```
+srun python run_evaluation.py \
+  --data ./class-explainer/explanations/run0 \
+  --fraction 0.6 \
+  --choose_best 20 \
+  --save_n 500 \
+  --threshold 5 \
+  --save_file eval_output/kw_stable_all_$SLURM_JOBID \
+  --unstable_file eval_output/kw_unstable_all_$SLURM_JOBID \
+  --filter selectf \
+  --keyword_data eval_output/kw_stable_all_$SLURM_JOBID \
+  --document_data ./class-explainer/explanations/run0 \
+  --plot_file eval_output/plot_$SLURM_JOBID \
+  --results eval_output/result_$SLURM_JOBID
+
+```
