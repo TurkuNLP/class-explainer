@@ -1,6 +1,6 @@
 # Class explainer for multilabel text classification
 
-By Samuel Rönnqvist and Amanda Myntti
+By Samuel Rönnqvist, Amanda Myntti and the original explainability code by Filip Ginter
 
 The goal of this project was to
 - Extract keywords from multilabel data
