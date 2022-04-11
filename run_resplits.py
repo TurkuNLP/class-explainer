@@ -47,8 +47,8 @@ options = argparser().parse_args(sys.argv[1:])
 
 print("Reading data", flush=True)
 dataset = train_multilabel.read_dataset(options.data)
-print("Splitting data", flush=True)
-dataset = train_multilabel.resplit(dataset, ratio=options.split, seed=options.seed)
+print("Splitting data with ratio %f and seed %d" % (options.split, options.seed), flush=True)
+dataset, train_indexes, val_indexes = train_multilabel.resplit(dataset, ratio=options.split, seed=options.seed)
 #dataset = train_multilabel.resplit(dataset, ratio=0.05, seed=options.seed)
 print("Binarizing data", flush=True)
 dataset = train_multilabel.binarize(dataset)
@@ -66,6 +66,7 @@ print("Model loaded succesfully.")
 print("Ready for explainability", flush=True)
 
 save_matrix = []
+save_attr = []
 
 n_examples = len(dataset['validation'])
 for i in range(n_examples):
@@ -81,17 +82,26 @@ for i in range(n_examples):
         for tg, ag in zip(target[0], aggregated):
             target = tg
             aggregated = ag
-            for tok,a_val in aggregated[0]:
-                line = ['document_'+str(i), str(lbl), target, str(tok), a_val, logits]
-                save_matrix.append(line)
+            for j, (tok,a_val) in enumerate(aggregated[0]):
+                if j == 0:
+                    line = ['%s%d' % (['t','d'][val_indexes[i][0]], val_indexes[i][1]), str(lbl), target, logits]
+                    save_matrix.append(line)
+                line = ['%s%d' % (['t','d'][val_indexes[i][0]], val_indexes[i][1]), str(tok), a_val]
+                save_attr.append(line)
     else:  #for no classification, save none for target and a_val
+        line = ['%s%d' % (['t','d'][val_indexes[i][0]], val_indexes[i][1]), str(lbl), "None", logits]
+        save_matrix.append(line)
         for word in txt.split():
-            line = ['document_'+str(i), str(lbl), "None", word, "None", logits]
-            save_matrix.append(line)
+            line = ['%s%d' % (['t','d'][val_indexes[i][0]], val_indexes[i][1]), word, "None"]
+            save_attr.append(line)
+            #line = ['document_'+str(i), str(lbl), "None", word, "None", logits]
+            #save_matrix.append(line)
     if i % 1000 == 999:
-        pd.DataFrame(save_matrix).to_csv(options.save_explanations+'.tsv', sep="\t")
+        pd.DataFrame(save_matrix).to_csv(options.save_explanations+'p.tsv', sep="\t")
+        pd.DataFrame(save_attr).to_csv(options.save_explanations+'a.tsv', sep="\t")
 
-pd.DataFrame(save_matrix).to_csv(options.save_explanations+'.tsv', sep="\t")
+pd.DataFrame(save_matrix).to_csv(options.save_explanations+'p.tsv', sep="\t")
+pd.DataFrame(save_attr).to_csv(options.save_explanations+'a.tsv', sep="\t")
 print("Explanations succesfully saved")
 
 # nice colours :)

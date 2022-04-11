@@ -14,6 +14,7 @@ with gzip.open(sys.argv[1], 'rt', encoding='utf-8') as csvfile:
         reader = csv.reader(csvfile, delimiter='\t')
         reader.__next__()
         last_doc = None
+        last_true = None
         doc_words = []
         doc_preds = []
         for i,row in enumerate(reader):
@@ -22,6 +23,7 @@ with gzip.open(sys.argv[1], 'rt', encoding='utf-8') as csvfile:
                     continue
             pred_label = int(pred_label)
             true_labels = true_labels[1:-1].split()
+            true_labels = [int(label) for label in true_labels if int(label) <= 7] ## Skip sub-registers
 
             if i%100000==0:
                 print('%s:%d -> %s:%d' % (sys.argv[1], i, sys.argv[2], j))
@@ -29,12 +31,10 @@ with gzip.open(sys.argv[1], 'rt', encoding='utf-8') as csvfile:
             if last_doc != doc:
                 if last_doc is None:
                     last_doc = doc
+                    last_true = true_labels
                     doc_preds = [pred_label]
                 else:
-                    true_labels = [int(label) for label in true_labels if int(label) <= 7] ## Skip sub-registers
-
-                    print('\t'.join([doc, str(true_labels), str(doc_preds), ' '.join(doc_words)]), file=outfile)
-
+                    print('\t'.join([doc, str(last_true), str(doc_preds), ' '.join(doc_words)]), file=outfile)
                     doc_words = []
                     doc_preds = [pred_label]
 
@@ -45,8 +45,9 @@ with gzip.open(sys.argv[1], 'rt', encoding='utf-8') as csvfile:
                 doc_words.append(word.lower().replace('</s>',''))
 
             last_doc = doc
+            last_true = true_labels
             j += 1
 
         if not (word == '<s>' or pred_label == 'None' or int(pred_label) > 7):
-            true_labels = [int(label) for label in true_labels if int(label) <= 7]
-        print('\t'.join([doc, str(true_labels), str(doc_preds), ' '.join(doc_words)]), file=outfile)
+            #true_labels = [int(label) for label in true_labels if int(label) <= 7]
+            print('\t'.join([doc, str(true_labels), str(doc_preds), ' '.join(doc_words)]), file=outfile)

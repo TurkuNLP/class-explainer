@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=training
 #SBATCH --account=project_2002026
-#SBATCH --time=23:15:00
+#SBATCH --time=20:15:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
@@ -23,7 +23,7 @@ module purge
 source /scratch/project_2002026/samuel/VENVS/expl/bin/activate
 
 srun python run_resplits.py \
-  --data ../../veronika/simplified-data/en \
+  --data ../../veronika/simplified-data/orig_simplified/en \
   --model_name xlm-roberta-base \
   --lr 7.5e-5 \
   --epochs 12 \

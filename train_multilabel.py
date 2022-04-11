@@ -98,16 +98,20 @@ def resplit(dataset, ratio=0.5, seed=None):
     if seed is not None:
         random.seed(seed)
 
+    original_train_size = len(dataset['train'])
     while True:
         # We shuffle the save data in concat
-        dataset['concat'].shuffle(seed=seed)
+        #dataset['concat'].shuffle(seed=seed)
+        new_order = list(range(len(dataset['concat'])))
+        random.shuffle(new_order)
         # Three-way confirmation of whether the split is good (all labels in train, all labels in val, values balanced)
         ok = [False]*3
         deviance = 0
         # i = index in ok, key = {train,validation}, beg = start index, end = end index
         for i, (key,beg,end) in enumerate([('train', 0, int(len(dataset['concat'])*ratio)), ('validation', int(len(dataset['concat'])*ratio), len(dataset['concat']))]):
             # insert ratioed amount of dataset[concat] to key
-            dataset[key] = dataset['concat'].select(range(beg,end))
+            #dataset[key] = dataset['concat'].select(range(beg,end))
+            dataset[key] = dataset['concat'].select(new_order[beg:end])
             # get labels and see if all labels are represented, if yes: ok[i] = True
             label_counts = get_label_counts(dataset[key])
             ok[i] = len(label_counts) == len(all_label_counts)
@@ -124,7 +128,9 @@ def resplit(dataset, ratio=0.5, seed=None):
           print("Label distribution: ")
           print("train: ", get_label_counts(dataset['train']))
           print("val: ", get_label_counts(dataset['validation']))
-          return dataset
+          data_indexes = [(i//original_train_size, i%original_train_size) for i in new_order]
+          open("data_split_%s.json" % seed, 'w').write("{\n'train': %s\n,\n'val': %s\n}" % (str(data_indexes[:int(len(dataset['concat'])*ratio)]), str(data_indexes[int(len(dataset['concat'])*ratio):])))
+          return dataset, data_indexes[:int(len(dataset['concat'])*ratio)], data_indexes[int(len(dataset['concat'])*ratio):] 
         else:
           print("Split unsuccesfull.")
 
