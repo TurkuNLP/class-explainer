@@ -1,17 +1,33 @@
 # Class explainer for multilabel text classification
 
-This repository contains the code for the Stable Attribution Class Explanation (SACX) method for providing explanations of text classes in the form of keyword lists, based on input attribution (Integrated Gradients) from deep text classification models (e.g. XLM-R), and repeated training/explaining in order to stabilize the keywords.  
-The code is developed by Samuel Rönnqvit and Amanda Myntti, and the original explainability code by Filip Ginter. The method and its systematic evaluation is described in the paper Explaining Classes through Stable Word Attributions by Samuel R\"onnqvist, Amanda Myntti, Aki-Juhani Kyr\"ol\"ainen, Filip Ginter and Veronika Laippala, forthcoming in Findings of ACL 2022.
+This repository contains the code for the *Stable Attribution Class Explanation (SACX)* method for providing explanations of text classes in the form of keyword lists, based on input attribution (Integrated Gradients) from deep text classification models (e.g. XLM-R), and repeated training/explaining in order to stabilize the keywords. The code is developed by Samuel Rönnqvist and Amanda Myntti, and the original explainability code by Filip Ginter. The method and its systematic evaluation is described in the paper [*Explaining Classes through Stable Word Attributions*](https://aclanthology.org/2022.findings-acl.85/) by Samuel Rönnqvist, Amanda Myntti, Aki-Juhani Kyröläinen, Filip Ginter and Veronika Laippala. Please cite, if you make use of this code.
+
+```
+@inproceedings{ronnqvist-etal-2022-explaining,
+    title = "Explaining Classes through Stable Word Attributions",
+    author = {R{\"o}nnqvist, Samuel and Kyr{\"o}l{\"a}inen, Aki-Juhani and Myntti, Amanda and Ginter, Filip and Laippala, Veronika},
+    booktitle = "Findings of the Association for Computational Linguistics: ACL 2022",
+    year = "2022",
+    pages = "1063--1074",
+}
+```
 
 ### Quick start (with slurm)
-Training the classifier and explaining on a validation split, e.g. 20 times: <code>for i in {000..019}; do sbatch sl-train-explain.bash run$i 123$i; done</code>
+Training the classifier and explaining on a validation split, e.g. 20 times: 
+```
+for i in {000..019}; do sbatch sl-train-explain.bash run$i 123$i; done
+```
 (saving explanation files as run000 etc., using seed 123000 etc.)
 
 Converting explanation files:
-<code>for N in {000..019}; do python3 convert_explanations.py explanations/run$N; done</code>
+```
+for N in {000..019}; do python3 convert_explanations.py explanations/run$N; done
+```
 
 Extracting keywords:
-<code>sbatch sl-eval.bash 0.7 20 0.7 0.3 run0</code>
+```
+sbatch sl-eval.bash 0.7 20 0.7 0.3 run0
+```
 
 ### Alternative: multilingual setup
 ```
