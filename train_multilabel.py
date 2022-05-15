@@ -124,7 +124,7 @@ def resplit(dataset, ratio=0.5, seed=None):
 
         # if all is good
         if all(ok):
-          print("Split succesfull! Deviance: ",deviance)
+          print("Split successfull! Deviance: ",deviance)
           print("Label distribution: ")
           print("train: ", get_label_counts(dataset['train']))
           print("val: ", get_label_counts(dataset['validation']))
@@ -132,7 +132,13 @@ def resplit(dataset, ratio=0.5, seed=None):
           open("data_split_%s.json" % seed, 'w').write("{\n'train': %s\n,\n'val': %s\n}" % (str(data_indexes[:int(len(dataset['concat'])*ratio)]), str(data_indexes[int(len(dataset['concat'])*ratio):])))
           return dataset, data_indexes[:int(len(dataset['concat'])*ratio)], data_indexes[int(len(dataset['concat'])*ratio):] 
         else:
-          print("Split unsuccesfull.")
+          print("Split unsuccessfull.")
+          if ratio>0.99:
+            print("Disregarding validation distribution because of intentionally skewed split ratio.")
+            data_indexes = [(i//original_train_size, i%original_train_size) for i in new_order]
+            open("data_split_%s.json" % seed, 'w').write("{\n'train': %s\n,\n'val': %s\n}" % (str(data_indexes[:int(len(dataset['concat'])*ratio)]), str(data_indexes[int(len(dataset['concat'])*ratio):])))
+            return dataset, data_indexes[:int(len(dataset['concat'])*ratio)], data_indexes[int(len(dataset['concat'])*ratio):] 
+
 
 
 
@@ -164,7 +170,10 @@ def sample_dataset(d,n,sample):
 
 def preprocess_text(d):
     # Separate punctuations from words by whitespace
-    d['sentence'] = re.sub(r"([\.,:;\!\?\"\(\)])([\w\d])", r"\1 \2", re.sub(r"([\.,:;\!\?\"\(\)])([\w\d])", r"\1 \2", d['sentence']))
+    try:
+        d['sentence'] = re.sub(r"([\.,:;\!\?\"\(\)])([\w\d])", r"\1 \2", re.sub(r"([\.,:;\!\?\"\(\)])([\w\d])", r"\1 \2", d['sentence']))
+    except:
+        print("Warning: Unable to run regex on text of type", type(d['sentence']))
     return d
 
 def remove_NA(d):
@@ -203,12 +212,16 @@ def read_dataset(path):
   Saved into DatasetDict with keys train, validation and concat, where concat
   contains the combined data that is used for saving and shuffling.
   """
+  if type(path) is str:
+    data_files = {'train':path+'/train.tsv-simp.tsv',
+                    'validation': path+'/dev.tsv-simp.tsv',
+                    'concat': [path+'/train.tsv-simp.tsv', path+'/dev.tsv-simp.tsv']}
+  else:
+    data_files = path
 
   dataset = load_dataset(
         'csv',
-        data_files={'train':path+'/train.tsv-simp.tsv',
-                    'validation': path+'/dev.tsv-simp.tsv',
-                    'concat': [path+'/train.tsv-simp.tsv', path+'/dev.tsv-simp.tsv']},
+        data_files=data_files,
         delimiter='\t',
         column_names=['label', 'sentence']
         )

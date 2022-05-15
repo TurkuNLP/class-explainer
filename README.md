@@ -1,14 +1,28 @@
 # Class explainer for multilabel text classification
 
-By Samuel Rönnqvist, Amanda Myntti and the original explainability code by Filip Ginter
+This repository contains the code for the Stable Attribution Class Explanation (SACX) method for providing explanations of text classes in the form of keyword lists, based on input attribution (Integrated Gradients) from deep text classification models (e.g. XLM-R), and repeated training/explaining in order to stabilize the keywords.  
+The code is developed by Samuel Rönnqvit and Amanda Myntti, and the original explainability code by Filip Ginter. The method and its systematic evaluation is described in the paper Explaining Classes through Stable Word Attributions by Samuel R\"onnqvist, Amanda Myntti, Aki-Juhani Kyr\"ol\"ainen, Filip Ginter and Veronika Laippala, forthcoming in Findings of ACL 2022.
 
-The goal of this project was to
-- Extract keywords from multilabel data
-- Analyse the quality of the extracted keywords
+### Quick start (with slurm)
+Training the classifier and explaining on a validation split, e.g. 20 times: <code>for i in {000..019}; do sbatch sl-train-explain.bash run$i 123$i; done</code>
+(saving explanation files as run000 etc., using seed 123000 etc.)
 
-For more information on the dataset and our motivation, please check: (link to wherever, the paper or documentation or...?)
+Converting explanation files:
+<code>for N in {000..019}; do python3 convert_explanations.py explanations/run$N; done</code>
 
-## The extraction consists of the following parts:
+Extracting keywords:
+<code>sbatch sl-eval.bash 0.7 20 0.7 0.3 run0</code>
+
+### Alternative: multilingual setup
+```
+for i in {000..019}; do sbatch sl-train-explain-multiling.bash multiling$i 123$i;done
+for N in {000..019}; do for LANG in ar en fi fr zh; do python3 convert_explanations_multi.py explanations/multiling${N}p_$LANG.tsv explanations/multiling${N}a_$LANG.tsv explanations/multiling-$LANG-${N}; done; done
+for LANG in sbatch sl-eval-multiling.bash 0.7 20 0.7 0.3 multiling-$LANG; done
+```
+
+## Components
+
+The extraction consists of the following parts:
 
 - run_resplits.py, that runs train_multilabel.py and explain_multilabel.py
     - reads the data (train and dev sets), preprocesses it and makes a new split into random training and validation sets. 
@@ -35,22 +49,9 @@ run_resplits.py requires following parameters:
 - *save_model*: file for saving the model
 - *save_explanations*: file for saving the results
 
-The results are saved as a pandas dataframe:
+The results are saved in two types of TSV files: prediction files (e.g. run000p.tsv) and word attribution files (e.g. run000a.tsv). The <code>convert_explanations.py</code> script combines both and produces two other types of files used for the subsequent processing: score files (e.g. run000s.tsv) and text files (e.g. run000wNF.tsv).
 
-```
-document_id     true_label      pred_label      token       score
-doc_0           [1,5]           1               words       0.122
-doc_0           [1,5]           1               have        0.005
-doc_0           [1,5]           1               meanings    0.093
-doc_0           [1,5]           1               .           0.000
-doc_0           [1,5]           4               words       0.044
-doc_0           [1,5]           4               have        0.032
-doc_0           [1,5]           4               meanings    0.009
-doc_0           [1,5]           4               .           0.000
-doc_1           [6]             6               It          0.002
-...
-...
-```
+<code>run_evaluation.py</code> extracts keywords and performs evaluation of them. It uses a document frequency dictionary (class_df.json) that can be pre-calculated using <code>count_class_words.py</code>.
 
 run_evaluation.py requires following parameters:
 

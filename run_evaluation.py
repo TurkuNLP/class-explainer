@@ -60,8 +60,8 @@ def argparser():
 
     ap.add_argument('--plot_file', metavar='FILE', required=True,
                     help='File to save plots')
-    ap.add_argument('--results', metavar='FILE', required=True,
-                    help='File to save final results')
+    #ap.add_argument('--results', metavar='FILE', required=True,
+    #                help='File to save final results')
     return ap
 
 
