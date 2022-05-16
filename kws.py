@@ -123,7 +123,8 @@ def filter_class_df(data, key, number, options):
     should always be 0.
     Save to a file.
     """
-    with open('class_df.json') as f:   #../../samuel/class-explainer/
+    #with open('class_df.json') as f:   #../../samuel/class-explainer/
+    with open(options.class_df) as f:   #../../samuel/class-explainer/
         dataset = json.load(f)
     # class_df contains data like this:
     # {HI: {baking: 5, recipe: 5, apple: 2},

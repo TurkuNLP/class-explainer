@@ -40,5 +40,6 @@ srun python run_evaluation.py \
   --filter selectf \
   --keyword_data eval_output/kw_${DATA}_$1-$2-$3_ \
   --document_data explanations/$DATA \
-  --plot_file eval_output/plot_
+  --plot_file eval_output/plot_ \
+  --class_df $6
 seff $SLURM_JOBID

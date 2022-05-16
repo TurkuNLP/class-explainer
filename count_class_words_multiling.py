@@ -10,10 +10,10 @@ File 'class_df.json' is required for metric calculations in evaluation (run_eval
 PATH = '../../veronika/simplified-data/en/'
 PATH = 'oscar_data'
 
-class_DF = collections.defaultdict(lambda: collections.defaultdict(lambda: 0))
-class_TF = collections.defaultdict(lambda: collections.defaultdict(lambda: 0))
 vectorizer = CountVectorizer()
 for lang in ['ar', 'en', 'fi', 'fr', 'zh']:
+    class_DF = collections.defaultdict(lambda: collections.defaultdict(lambda: 0))
+    class_TF = collections.defaultdict(lambda: collections.defaultdict(lambda: 0))
     dataset = 'oscar_data_%s_40k.tsv' % lang
     for i, row in enumerate(open(PATH+'/'+lang+'/'+dataset, encoding='utf-8')):
         try:
@@ -42,5 +42,8 @@ for lang in ['ar', 'en', 'fi', 'fr', 'zh']:
             print(' '.join(["%s:%d" % x for x in sorted([(k, len(v)) for k,v in class_DF.items()], key=lambda x:-x[1])]))
             print()#print("N docs:", n_docs)
 
-json.dump(class_DF, open("class_df.json",'w'))
-json.dump(class_TF, open("class_tf.json",'w'))
+    json.dump(class_DF, open(f"class_df_{lang}.json",'w'))
+    json.dump(class_TF, open(f"class_tf_{lang}.json",'w'))
+
+#json.dump(class_DF, open("class_df.json",'w'))
+#json.dump(class_TF, open("class_tf.json",'w'))

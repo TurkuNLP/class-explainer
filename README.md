@@ -33,7 +33,7 @@ sbatch sl-eval.bash 0.7 20 0.7 0.3 run0
 ```
 for i in {000..019}; do sbatch sl-train-explain-multiling.bash multiling$i 123$i;done
 for N in {000..019}; do for LANG in ar en fi fr zh; do python3 convert_explanations_multi.py explanations/multiling${N}p_$LANG.tsv explanations/multiling${N}a_$LANG.tsv explanations/multiling-$LANG-${N}; done; done
-for LANG in sbatch sl-eval-multiling.bash 0.7 20 0.7 0.3 multiling-$LANG; done
+for LANG in ar en fi fr zh; do sbatch sl-eval-multiling.bash 0.7 20 0.7 0.3 multiling-$LANG; done
 ```
 
 ## Components
