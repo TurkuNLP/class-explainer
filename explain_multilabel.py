@@ -69,11 +69,9 @@ def aggregate(inp,attrs,tokenizer):
     for l in inp.input_ids.cpu().tolist():
         detokenized.append(tokenizer.convert_ids_to_tokens(l))
     attrs=attrs.cpu().tolist()
-
     aggregated=[]
     for token_list,attr_list in zip(detokenized,attrs): #One text from the batch at a time!
         res=[]
-        #print(token_list)
         for token,a_val in zip(token_list,attr_list):
             if token == "<s>" or token == "</s>":  # special tokens
                 res.append((token,a_val))

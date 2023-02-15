@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=kw_selec
-#SBATCH --account=project_2002026
-#SBATCH --time=15:15:00
+#SBATCH --account=project_2005092
+#SBATCH --time=07:10:00
 #SBATCH --partition=small
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
@@ -28,7 +28,7 @@ echo "Evaluation parameters: PredTh=$3, SelFreq=$1, WordsPerDoc=$2, FreqPrefTh=$
 
 
 srun python run_evaluation.py \
-  --data explanations/th$3/$DATA \
+  --data explanations_final/th$3/$DATA \
   --prediction_th $3 \
   --selection_freq $1 \
   --words_per_doc $2 \
@@ -39,7 +39,8 @@ srun python run_evaluation.py \
   --unstable_file eval_output/kw_${DATA}_all_ \
   --filter selectf \
   --keyword_data eval_output/kw_${DATA}_$1-$2-$3_ \
-  --document_data explanations/$DATA \
+  --document_data explanations_final/multiling-$LANG- \
   --plot_file eval_output/plot_ \
   --class_df $6
 seff $SLURM_JOBID
+

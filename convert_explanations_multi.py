@@ -2,6 +2,7 @@ import sys
 import csv
 import collections
 import numpy as np
+import os.path
 
 """
 Filter and simplify raw explanations file for further processing, with explicit naming of input files. Arguments: <input prediction tsv (e.g. run000p.tsv)> <input attribution tsv (e.g. run000a.tsv)> <output filename prefix>.
@@ -26,10 +27,14 @@ with open(sys.argv[1], encoding='utf-8') as pred_file:
 alt_thresholds = [0.7, 0.9]
 #path = '/'.join(sys.argv[1].split('/')[:-1])
 path = '/'.join(sys.argv[3].split('/')[:-1])
+print("PATH", path)
 #fn_prefix = sys.argv[1].split('/')[-1]
 fn_prefix = sys.argv[3].split('/')[-1]
 
 alt_scores_files = [open("%s/th%.1f/%s-s.tsv" % (path, th, fn_prefix), 'w', encoding='utf-8') for th in alt_thresholds]
+
+
+#alt_scores_files = [open("%s/th%.1f/%s-s.tsv" % (path, th, fn_prefix), 'w', encoding='utf-8') for th in alt_thresholds]
 
 
 missing_markers = 0
@@ -43,9 +48,9 @@ with open(sys.argv[2], encoding='utf-8') as attr_file:
 			last_doc = None
 			doc_words = []
 			saved_words = True
+			print("XXX words file", words_file)
 			for i, row in enumerate(attr_reader):
 				_, docID, word, attr = row
-
 				if word == '</s>':# and int(pred_dict[docID][pred_nr]) < 8:
 					print('\t'.join([docID, str([int(x) for x in true_dict[docID]]), pred_dict[docID][pred_nr], ' '.join(doc_words).lower()]), file=words_file)
 					saved_words = True

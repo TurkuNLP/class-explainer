@@ -7,21 +7,26 @@ import json
 File 'class_df.json' is required for metric calculations in evaluation (run_evaluation.py). """
 
 
-PATH = '../../veronika/simplified-data/en/'
-PATH = 'oscar_data'
+#PATH = '../../veronika/simplified-data/en/'
+#PATH = 'oscar_data'
+
+PATH='/scratch/project_2005092/veronika/class-explainer/final_oscar_data/'
+
+
 
 vectorizer = CountVectorizer()
-for lang in ['ar', 'en', 'fi', 'fr', 'zh']:
+for lang in ['en', 'fi', 'fr']:
     class_DF = collections.defaultdict(lambda: collections.defaultdict(lambda: 0))
     class_TF = collections.defaultdict(lambda: collections.defaultdict(lambda: 0))
-    dataset = 'oscar_data_%s_40k.tsv' % lang
+    dataset="all.tsv"
+   # dataset = 'oscar_data_%s_40k.tsv' % lang
     for i, row in enumerate(open(PATH+'/'+lang+'/'+dataset, encoding='utf-8')):
         try:
             labels, text = row.split('\t')
         except:
             continue
         labels = labels.strip().split(' ')
-        labels = [l for l in labels if l in set("HI ID IN IP LY NA OP SP".split())]
+        labels = [l for l in labels if l in set("HI ID IN IP NA OP".split())]
         #text = ' '.join(text.strip().split(' ')[:300]) # approximation of token context size
         text = ' '.join(text.strip().split(' '))
         try:
@@ -42,8 +47,8 @@ for lang in ['ar', 'en', 'fi', 'fr', 'zh']:
             print(' '.join(["%s:%d" % x for x in sorted([(k, len(v)) for k,v in class_DF.items()], key=lambda x:-x[1])]))
             print()#print("N docs:", n_docs)
 
-    json.dump(class_DF, open(f"class_df_{lang}.json",'w'))
-    json.dump(class_TF, open(f"class_tf_{lang}.json",'w'))
+    json.dump(class_DF, open(f"explanations_final/class_df_files/class_df_{lang}.json",'w'))
+    json.dump(class_TF, open(f"explanations_final/class_df_files/class_tf_{lang}.json",'w'))
 
 #json.dump(class_DF, open("class_df.json",'w'))
 #json.dump(class_TF, open("class_tf.json",'w'))

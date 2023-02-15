@@ -13,7 +13,7 @@ import json
 
 PATH = ''
 NUMBER_OF_KEYWORDS = 100
-key_values = ['HI', 'ID', 'IN', 'IP','LY', 'NA', 'OP']
+key_values = ['HI', 'ID', 'IN', 'IP','NA', 'OP']
 FREQUENT_PREDICTIONS_THRESHOLD = 0.5
 
 
@@ -37,6 +37,7 @@ def argparser():
 
 ############################ PREPROCESSING ################################
 def preprocess_text(d):
+#    print("prprocess_text l 40", d)
     # Separate punctuations from words by whitespace
     if len(d) == 0:
         d= " "
@@ -46,13 +47,16 @@ def preprocess_text(d):
 
 
 def preprocess_label(d):
+#    print("label to be preprocessed", d)
     #d2 = re.sub(r"\s?([^\w\s'/\-\+$]+)\s?", r" \1 ", d)
     if type(d) is not str:
+ #       print("D", d)
         return d
     else:
         d2 = d.replace(',',' ').replace('[','').replace(']','').split()
         new_label = [int(s) for s in d2 if s.isdigit()]
         new_label2 = [s for s in new_label if s < 7]
+  #      print("new label2", new_label2)
         return new_label2
 
 def flatten(t):
@@ -76,6 +80,8 @@ def multimode(data):
 
     return res
 
+pd.set_option("display.max_rows", None, "display.max_columns", None)
+
 def get_labels(df_list, options):
     """
     Calculates the best predicted label(s) for each doc.
@@ -88,27 +94,32 @@ def get_labels(df_list, options):
 
     # concatenate all the dataframes
     df = pd.concat(df_list, axis = 0)
-
+    df.to_csv("main_df.csv")
+   # print("XX dflist", df_list, flush=True)
     # Loop over all the documents
     for doc in set(df['doc_id']):
+       # print("XXX doc", doc, flush=True)
         # get only the ones with this document id, and get the real label
         sub_df = df[df.doc_id == doc]
+        #print("sub_df", sub_df)
         true_labels = sub_df['true_label'].iloc[0]
+        print("True", true_labels)
         text = sub_df['text'].iloc[0]
 
         # get all possible predicted labels for this document
         pred_labels = []
         for index, row in sub_df.iterrows():
+            #print("row l 110 dis", row)
             pred_labels.append(row['pred_label'])
 
         pred_labels = flatten(pred_labels)
-
+        print("pred_labels 113 dis", pred_labels)
         # get the most common prediction(s) with multimode, and remove everything over 6
         #most_frequent_predictions_raw = np.array(multimode(pred_labels))
         #most_frequent_predictions = most_frequent_predictions_raw[most_frequent_predictions_raw < 7]
 
         n_experiments = len(df_list)
-        cntr = collections.Counter([x for x in pred_labels if x < 7])
+        cntr = collections.Counter([x for x in pred_labels if x < 5]) # used to be 7
         most_frequent_predictions = [cl for cl,cnt in cntr.items() if cnt >= n_experiments*options.frequent_predictions_th]
 
 
@@ -241,15 +252,26 @@ def distinctiveness(keywords):
 
 def distinctiveness(keywords):
     DF = collections.defaultdict(lambda: 0)
+ #   print("XXX keywords l 253 dis", keywords, flush=True)
     for lb in keywords:
+    #    print("XXX, lb", lb)
         for kw in keywords[lb].values:
+     #       print("XXX kw", kw)
             if type(kw) is not str:
-                kw = kw[0]
+                kw="NaN"
+#                kw = kw[0]
             DF[kw] += 1
 
     dists = []
     for lb in keywords:
-        kws = [kw if type(kw) is str else kw[0] for kw in keywords[lb].values]
+        kws=[]
+        for kw in keywords[lb].values:
+            if type(kw) is not str:
+                kw="NaN"
+            kws.append(kw)
+#        kws = [kw if type(kw) is str else kw="NaN" for kw in keywords[lb].values]
+
+#        kws = [kw if type(kw) is str else kw[0] for kw in keywords[lb].values]
         uniques = sum([1 for kw in kws if DF[kw] == 1])
         dists.append(uniques/len(keywords[lb]))
         print("Distinctivenss of %s: %.2f" % (lb, dists[-1]))
@@ -415,6 +437,8 @@ def coverage_macro_simple(labelled_predictions,keywords, style):
     t = []
     ref = []
     cross_cov_per_class = collections.defaultdict(lambda: [])
+ #   print("XXX row label", row['label'])
+  #  print("XXX key_values", key_values)
     for i, row in df.iterrows():
         label_num = row['label']
         text = row['text']
@@ -614,47 +638,58 @@ def corpus_coverage3(keywords):
 def evaluate_keywords_file(options):
     data_list = []
     num_files = 0
+    print("eval fires")
+#    try:
+ #       labelled_docs = pd.read_csv("%s-w_agg-%.1f.tsv" % (options.document_data, options.frequent_predictions_th),sep="\t",converters={'type': lambda x: [bool(y) for y in x.strip("[]").split(", ")], 'true_label': json.loads, 'pred_label': json.loads})
+  #  except:# FileNotFoundError: # modif 2906, 
 
-    try:
-        labelled_docs = pd.read_csv("%s-w_agg-%.1f.tsv" % (options.document_data, options.frequent_predictions_th),sep="\t",converters={'type': lambda x: [bool(y) for y in x.strip("[]").split(", ")], 'true_label': json.loads, 'pred_label': json.loads})
-    except FileNotFoundError:
-        for filename in glob.glob(options.document_data+"*w.tsv"):
+#/run-fi-2-wNF.tsv
+
+    for filename in glob.glob(options.document_data+"*wNF.tsv"):
             #try:
-            num_files +=1
-            print(filename, flush = True)
-            raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'true_label', 'pred_label', 'text'])
+        print("filename l 645 dis", filename)
+        num_files +=1
+#            print(filename, flush = True)
+        raw_data = pd.read_csv(filename, sep='\t', names=['doc_id', 'true_label', 'pred_label', 'text'])
             # remove null predictions
-            raw_data.dropna(axis = 0, how='any', inplace = True)
+        raw_data.dropna(axis = 0, how='any', inplace = True)
             # add white space to punctuation and lowercase the letters
-            raw_data['text'] = raw_data['text'].apply(preprocess_text)
+        raw_data['text'] = raw_data['text'].apply(preprocess_text)
             # add commas to multilabels and change them  to numeric data
-            raw_data['true_label'] = raw_data['true_label'].apply(preprocess_label)
-            raw_data['pred_label'] = raw_data['pred_label'].apply(preprocess_label)
+        raw_data['true_label'] = raw_data['true_label'].apply(preprocess_label)
+        raw_data['pred_label'] = raw_data['pred_label'].apply(preprocess_label)
             # add a tag for the source file
-            raw_data['source'] = filename
-            data_list.append(raw_data)
+        raw_data['source'] = filename
+        data_list.append(raw_data)
             #except:
             #    print("Error at ", filename, flush=True)
 
-        print("Length of data_list:", len(data_list))
-
+    print("XXXXXX l 662 dis Length of data_list:", len(data_list), flush=True)
+#    print("XXX data list", data_list, flush=True)
         # get the most common prediction for all documents
         # prediction must be 0...6
         # if there are labels between 0 and 6 that are equally good
         # keep them both
-        labelled_docs = get_labels(data_list, options)
+    labelled_docs = get_labels(data_list, options)
 
-        #print(labelled_docs.head(30))
-        labelled_docs.to_csv("%s-w_agg-%.1f.tsv" % (options.document_data, options.frequent_predictions_th), sep='\t')
+    print("XXX l 670labeled docs head", labelled_docs.head(30), flush=True)
+    labelled_docs.to_csv("%s-w_agg-%.1f.tsv" % (options.document_data, options.frequent_predictions_th), sep='\t')
 
     #labelled_docs = pd.read_csv(options.document_data+'w_agg.tsv', sep='\t')
 
-    labels = "HI IN ID IP LY NA OP".split()
+    labels = "HI ID IN IP NA OP".split()
+  #  print("XXX kwlist")
+ #   try:
+ #       print("token l 681", labels)#(options.keyword_data+l+'.tsv', sep='\t')[['token']].rename(columns={"token": l}) for l in labels)
+ #   except:
+ #       print("fail l 683 d")
     kw_list = [pd.read_csv(options.keyword_data+l+'.tsv', sep='\t')[['token']].rename(columns={"token": l}) for l in labels]
+#    print("l 682 d file", options.keyword_data+l+'.tsv')
+    print("XXX line 677 kwlist", kw_list)
     keywords = concatenate(kw_list, options.number_of_keywords)
 
     # NOW all is preprocessed
-    print("Preprocessing done", flush=True)
+    print("l 687 d Preprocessing done", flush=True)
 
     # THE CALCULATIONS
 
@@ -667,7 +702,10 @@ def evaluate_keywords_file(options):
         #print("Coverage: ", flush=True)
         #coverage_scores_macro_lennorm = coverage(labelled_docs, keywords, style)
         print("Coverage (macro simple): ", flush=True)
-        coverage_scores_macro_simple, cov_dist_diff, cov_dist_ratio, cov_dist_norm = coverage_macro_simple(labelled_docs, keywords, style)
+        try:
+            coverage_scores_macro_simple, cov_dist_diff, cov_dist_ratio, cov_dist_norm = coverage_macro_simple(labelled_docs, keywords, style)
+        except:
+            print("coverage failed")
         print("Coverage (micro multilabel): ", flush=True)
         coverage_scores_micro = coverage_micro_multilabel(labelled_docs, keywords, style)
         #print("Coverage (DF): ", flush=True)
@@ -698,6 +736,7 @@ def calculate(options):
     try:
         labelled_docs = pd.read_csv("%s-w_agg-%.1f.tsv" % (options.document_data, options.frequent_predictions_th),sep="\t",converters={'type': lambda x: [bool(y) for y in x.strip("[]").split(", ")], 'true_label': json.loads, 'pred_label': json.loads})
     except FileNotFoundError:
+        print("XXX line 734 d")
         for filename in glob.glob(options.document_data+"*w.tsv"):
             #try:
             num_files +=1
@@ -730,19 +769,19 @@ def calculate(options):
     #labelled_docs = pd.read_csv(options.document_data+'w_agg.tsv', sep='\t')
 
     # read the keywords per class
-    df_HI = pd.read_csv(options.keyword_data+'HI.tsv', sep='\t')[['token']].rename(columns={"token": "HI"})
-    df_IN = pd.read_csv(options.keyword_data+'IN.tsv', sep='\t')[['token']].rename(columns={"token": "IN"})
-    df_ID = pd.read_csv(options.keyword_data+'ID.tsv', sep='\t')[['token']].rename(columns={"token": "ID"})
-    df_IP = pd.read_csv(options.keyword_data+'IP.tsv', sep='\t')[['token']].rename(columns={"token": "IP"})
-    df_LY = pd.read_csv(options.keyword_data+'LY.tsv', sep='\t')[['token']].rename(columns={"token": "LY"})
-    df_NA = pd.read_csv(options.keyword_data+'NA.tsv', sep='\t')[['token']].rename(columns={"token": "NA"})
-    df_OP = pd.read_csv(options.keyword_data+'OP.tsv', sep='\t')[['token']].rename(columns={"token": "OP"})
+    HI = pd.read_csv(options.keyword_data+'HI.tsv', sep='\t')[['token']].rename(columns={"token": "HI"})
+    IN = pd.read_csv(options.keyword_data+'IN.tsv', sep='\t')[['token']].rename(columns={"token": "IN"})
+    ID = pd.read_csv(options.keyword_data+'ID.tsv', sep='\t')[['token']].rename(columns={"token": "ID"})
+    IP = pd.read_csv(options.keyword_data+'IP.tsv', sep='\t')[['token']].rename(columns={"token": "IP"})
+   # df_LY = pd.read_csv(options.keyword_data+'LY.tsv', sep='\t')[['token']].rename(columns={"token": "LY"})
+    NA = pd.read_csv(options.keyword_data+'NA.tsv', sep='\t')[['token']].rename(columns={"token": "NA"})
+    OP = pd.read_csv(options.keyword_data+'OP.tsv', sep='\t')[['token']].rename(columns={"token": "OP"})
 
-    kw_list = [df_HI, df_ID, df_IN, df_IP, df_LY, df_NA, df_OP]
+    kw_list = [HI, ID, IN, IP, NA, OP]
     keywords = concatenate(kw_list, options.number_of_keywords)
 
     # NOW all is preprocessed
-    print("Preprocessing done", flush=True)
+    print("Preprocessing done l 773 dis", flush=True)
 
 
 

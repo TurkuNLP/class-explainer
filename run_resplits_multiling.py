@@ -46,19 +46,18 @@ def argparser():
 options = argparser().parse_args(sys.argv[1:])
 
 print("Reading data", flush=True)
-#dataset = train_multilabel.read_dataset(options.data)
-langs = ['ar', 'en', 'fi', 'fr', 'zh']
-data_paths = {'train':[options.data+'/'+lang+'/train.tsv' for lang in langs],
-                    'validation': options.data+'/dev.tsv',
-                    'concat': [options.data+'/'+lang+'/train.tsv' for lang in langs]}
-for lang in langs:
-    data_paths['validation_'+lang] = options.data+'/'+lang+'/dev.tsv'
 
-dataset = train_multilabel.read_dataset(data_paths)
+langs = ['en', 'fi', 'fr']
 
-print("Splitting data with ratio %f and seed %d" % (options.split, options.seed), flush=True)
-dataset, train_indexes, val_indexes = train_multilabel.resplit(dataset, ratio=options.split, seed=options.seed)
-#dataset = train_multilabel.resplit(dataset, ratio=0.05, seed=options.seed)
+data_paths_v = {'en':options.data+'/en/all.tsv',
+'fi':options.data+'/fi/all.tsv',
+'fr':options.data+'/fr/all.tsv'
+}
+
+print("datapaths_v", data_paths_v)
+dataset = train_multilabel.read_dataset(data_paths_v)
+
+dataset = train_multilabel.resplit2(dataset)
 print("Binarizing data", flush=True)
 dataset = train_multilabel.binarize(dataset)
 print("Ready to train:", flush=True)
@@ -71,23 +70,24 @@ json.dump(report, open(report_file,'w'))
 model.to('cuda')
 print("Model loaded succesfully.")
 
-
 print("Ready for explainability", flush=True)
-
 
 for lang in langs:
     save_matrix = []
     save_attr = []
     print("Language:", lang)
     n_examples = len(dataset['validation_'+lang])
+    print("XXX n examples in this languages", n_examples)
     for i in range(n_examples):
         if i % 100 == 0:
             print("Explaining example %d/%d" % (i, n_examples), flush=True)
         txt = dataset['validation_'+lang]['sentence'][i]
+#        print("txt to be explained", txt)
         lbl = np.nonzero(dataset['validation_'+lang]['label'][i][0])[0]
         if txt == None:
             txt = " "   # for empty sentences
         target, aggregated, logits = explain_multilabel.explain(txt, model, tokenizer, int_bs=options.batch_size, n_steps=options.batch_size) #bs 44, nsteps 22?
+ 
         if target != None:
             # for all labels and their agg scores
             for tg, ag in zip(target[0], aggregated):

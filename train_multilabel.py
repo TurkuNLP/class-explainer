@@ -4,6 +4,7 @@ from transformers import TrainingArguments
 from transformers import Trainer
 from transformers import EarlyStoppingCallback
 from datasets import load_dataset
+from datasets import concatenate_datasets
 import datasets
 import pickle
 import sys
@@ -29,7 +30,7 @@ data_verbosity(log_level)
 
 
 # Hyperparameters
-tr =  ['en', 'fi', 'fr', 'sv']
+tr =  ['en', 'fi', 'fr']
 LEARNING_RATE=1e-4
 BATCH_SIZE=30
 TRAIN_EPOCHS=2
@@ -37,7 +38,7 @@ MODEL_NAME = 'xlm-roberta-base'
 MAX_DEVIANCE = 0.005
 PATIENCE = 5
 # these are printed out by make_dataset.py
-labels = ['HI', 'ID', 'IN', 'IP', 'LY', 'NA', 'OP', 'SP', 'av', 'ds', 'dtp', 'ed', 'en', 'fi', 'it', 'lt', 'mt', 'nb', 'ne', 'ob', 'ra', 're', 'rs', 'rv', 'sr']
+labels = ['HI', 'ID', 'IN', 'IP', 'NA', 'OP']#, 'av', 'ds', 'dtp', 'ed', 'en', 'fi', 'it', 'lt', 'mt', 'nb', 'ne', 'ob', 'ra', 're', 'rs', 'rv', 'sr']
 
 
 def argparser():
@@ -89,7 +90,21 @@ def get_label_counts(dataset):
             label_counts[label] += 1
     return label_counts
 
-def resplit(dataset, ratio=0.5, seed=None):
+
+def resplit2(dataset):
+    # this is the one used as June 2022
+# there are multilingual train+val sets + lang specific val sets
+    dataset_en = dataset["en"].train_test_split(test_size=0.5,shuffle=True)
+    dataset_fi = dataset["fi"].train_test_split(test_size=0.5,shuffle=True)
+    dataset_fr = dataset["fr"].train_test_split(test_size=0.5,shuffle=True)
+    dataset["train"] = concatenate_datasets([dataset_en['train'], dataset_fi['train'],dataset_fr['train']])
+    dataset["validation"] = concatenate_datasets([dataset_en['test'], dataset_fi['test'],dataset_fr['test']])
+    dataset["validation_en"] = dataset_en["test"]
+    dataset["validation_fr"] = dataset_fr["test"]
+    dataset["validation_fi"] = dataset_fi["test"]
+    return dataset
+
+def resplit(dataset, ratio=0.5, seed=None): # not used
     """ Shuffle and resplit train and validation sets """
 
     # get all labels for comparison
@@ -137,6 +152,7 @@ def resplit(dataset, ratio=0.5, seed=None):
             print("Disregarding validation distribution because of intentionally skewed split ratio.")
             data_indexes = [(i//original_train_size, i%original_train_size) for i in new_order]
             open("data_split_%s.json" % seed, 'w').write("{\n'train': %s\n,\n'val': %s\n}" % (str(data_indexes[:int(len(dataset['concat'])*ratio)]), str(data_indexes[int(len(dataset['concat'])*ratio):])))
+          #  print("XXX dataset", dataset, "indexes", data_indexes[:int(len(dataset['concat'])*ratio)])
             return dataset, data_indexes[:int(len(dataset['concat'])*ratio)], data_indexes[int(len(dataset['concat'])*ratio):] 
 
 
@@ -207,23 +223,14 @@ def binarize(dataset):
 
 
 def read_dataset(path):
-  """
-  Read the data from tsv-files train.tsv-simp.tsv and dev.tsv-simp.tsv.
-  Saved into DatasetDict with keys train, validation and concat, where concat
-  contains the combined data that is used for saving and shuffling.
-  """
-  if type(path) is str:
-    data_files = {'train':path+'/train.tsv-simp.tsv',
-                    'validation': path+'/dev.tsv-simp.tsv',
-                    'concat': [path+'/train.tsv-simp.tsv', path+'/dev.tsv-simp.tsv']}
-  else:
-    data_files = path
-
+  data_files = path
+  print("XXX data_files", path)
   dataset = load_dataset(
         'csv',
         data_files=data_files,
         delimiter='\t',
-        column_names=['label', 'sentence']
+        column_names=['label', 'sentence'],
+        cache_dir = "v_cachedir"
         )
 
   # Remove errors and format the labels
@@ -232,8 +239,8 @@ def read_dataset(path):
   dataset = dataset.map(preprocess_text)
 
   # get the label distribution of the whole data
-  label_counts = get_label_counts(dataset['concat'])
-  print("Labels of the whole dataset: ",label_counts)
+ # label_counts = get_label_counts(dataset['concat'])
+  #print("Labels of the whole dataset: ",label_counts)
 
   print("Dataset succesfully loaded. ")
   return dataset
@@ -278,7 +285,6 @@ def train(dataset, options):
   print("Learning rate: ", options.lr)
   print("Batch size: ", options.batch_size)
   print("Epochs: ", options.epochs)
-
   # Model downloading
   num_labels = len(dataset['train']['label'][0][0]) #here double brackets are needed!
   print("Downloading model", flush=True)
@@ -336,8 +342,8 @@ def train(dataset, options):
   report = classification_report(true_ones,pred_ones, target_names = labels, output_dict=True)
 
   # save the model
-  #if options.save_model is not None:
-  #   torch.save(trainer.model, options.save_model)#"models/multilabel_model3_fifrsv.pt")
+  if options.save_model is not None:
+     torch.save(trainer.model, options.save_model)#"models/multilabel_model3_fifrsv.pt")
 
   return model, tokenizer, report
 
@@ -350,7 +356,7 @@ if __name__=="__main__":
   print("Reading data")
   dataset = read_dataset(options.data)
   print("Splitting data")
-  dataset = resplit(dataset, ratio=options.split, seed=options.seed)
+  dataset = resplit2(dataset)#, ratio=options.split, seed=options.seed)
   print("Binarizing data")
   dataset = binarize(dataset)
   print("Ready to train:")
